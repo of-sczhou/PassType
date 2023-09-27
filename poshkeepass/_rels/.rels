@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Type="http://schemas.microsoft.com/packaging/2010/07/manifest" Target="/PoShKeePass.nuspec" Id="Rff9c0078d43f42e4" />
+  <Relationship Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="/package/services/metadata/core-properties/2a7d5e6ebe964d5e84b9dae208b4e9b6.psmdcp" Id="R6a70680063084e94" />
+</Relationships>

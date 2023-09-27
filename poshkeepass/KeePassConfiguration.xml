@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='style.xsl'?>
+<Settings>
+  <DatabaseProfiles>
+    <Profile Name="238513324">
+      <DatabasePath>E:\1D\OneDrive\KeePass\Database.kdbx</DatabasePath>
+      <KeyPath>C:\Users\Oleg\Documents\Database.keyx</KeyPath>
+      <UseNetworkAccount>False</UseNetworkAccount>
+      <UseMasterKey>True</UseMasterKey>
+      <AuthenticationType>KeyAndMaster</AuthenticationType>
+      <Default>True</Default>
+    </Profile>
+  </DatabaseProfiles>
+  <PasswordProfiles />
+</Settings>

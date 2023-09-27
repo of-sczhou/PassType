@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>PoShKeePass</id>
+    <version>2.1.3</version>
+    <authors>John Klann</authors>
+    <owners>Unknown</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <licenseUrl>https://github.com/PSKeePass/PoShKeePass/blob/master/license</licenseUrl>
+    <projectUrl>https://github.com/PSKeePass/PoShKeePass</projectUrl>
+    <description>PoShKeePass is a PowerShell module that combines the ease of the PowerShell cli and the extensibility of the KeePassLib API to provide a powerful and easy to use management and automating platform for KeePass databases.</description>
+    <releaseNotes>https://github.com/PSKeePass/PoShKeePass/blob/master/changelog.md</releaseNotes>
+    <copyright>(c) 2019 John Klann. All rights reserved.</copyright>
+    <tags>PSKeePass PowerShell KeePass PoShKeePass Automation Management Database PSModule PSIncludes_Function PSFunction_New-KeePassEntry PSFunction_Get-KeePassEntry PSFunction_Update-KeePassEntry PSFunction_Remove-KeePassEntry PSFunction_New-KeePassGroup PSFunction_Get-KeePassGroup PSFunction_Update-KeePassGroup PSFunction_Remove-KeePassGroup PSFunction_New-KeePassPassword PSFunction_New-KeePassDatabaseConfiguration PSFunction_Get-KeePassDatabaseConfiguration PSFunction_Remove-KeePassDatabaseConfiguration PSFunction_ConvertTo-KPPSObject PSFunction_New-KeePassDatabase PSFunction_Update-KeePassDatabaseConfiguration PSCommand_New-KeePassEntry PSCommand_Get-KeePassEntry PSCommand_Update-KeePassEntry PSCommand_Remove-KeePassEntry PSCommand_New-KeePassGroup PSCommand_Get-KeePassGroup PSCommand_Update-KeePassGroup PSCommand_Remove-KeePassGroup PSCommand_New-KeePassPassword PSCommand_New-KeePassDatabaseConfiguration PSCommand_Get-KeePassDatabaseConfiguration PSCommand_Remove-KeePassDatabaseConfiguration PSCommand_ConvertTo-KPPSObject PSCommand_New-KeePassDatabase PSCommand_Update-KeePassDatabaseConfiguration</tags>
+  </metadata>
+</package>
