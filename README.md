@@ -1,6 +1,6 @@
 # PassType
 Handy GUI-script for KeePass databases.
-This graphical script for Windows allows you to work with multiple (up to three in the current release) KeePass databases. Its simple graphical interface and constant presence in the System Tray make it convenient to select and arrange entries from KeePass databases.
+This graphical script for Windows allows you to work with multiple (up to three in the current release) KeePass databases. A simple graphical interface and constant presence in the system tray make it easy and fast to select and use KeePass Entries.
 
 This script is designed for system adiministrators, it allows printing credentials from KeePass databases to any consoles (VMware vmrc, Microsoft Hyper-V, HP iLo, Dell iDrac, or whatever you use).
 
