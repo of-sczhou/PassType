@@ -2,7 +2,7 @@
 Handy GUI-script for KeePass databases.
 This graphical script for Windows allows you to work with multiple (up to three in the current release) KeePass databases. Its simple graphical interface and constant presence in the System Tray make it convenient to select and arrange entries from KeePass databases.
 
-This script is designed for system adiministrators, it allows printing credentials from KeePass databases to any consoles (vmrc, Hper-V, HP ILo, Dell iDrac, or whatever you use)? .
+This script is designed for system adiministrators, it allows printing credentials from KeePass databases to any consoles (vmrc, Hper-V, HP ILo, Dell iDrac, or whatever you use).
 
 Each KeePass entry corresponds to its own button. When a button is pressed, the script programmatically types the login and password into the desired program. Secret information does not fit on the clipboard. Pressing the button with Ctrl only sends the password.
 
