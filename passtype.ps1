@@ -4,11 +4,11 @@ $appName = "PassType"
 
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
+$ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
+Add-Type -Path $($ExecDir + "\InputManager.dll")
 
 # Hide powershell console (if not running in Powershell ISE)
 if ((Get-Process -PID $pid).ProcessName -ne "powershell_ise") { $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) }
-
-$ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
 
 Class DBInstance {
     [string]$DBPath
@@ -114,6 +114,7 @@ $Reader=(New-Object System.Xml.XmlNodeReader $XAMLSelectorWindow)
 try { $Window_Selector = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
 $XAMLSelectorWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Selector.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
+# Read config file if it exists
 Try {
     $AppSettings = Get-Content -Path $($ExecDir + "\" + $appName + ".ini") -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
     $Global:DBInstances = $AppSettings[0].value
@@ -272,28 +273,12 @@ function PassType_Entrance {
 
 PassType_Entrance
 
-Add-Type -Path $($ExecDir + "\InputManager.dll")
-
-# Common Variables, types
+# Common variables, objects
 $Global:Delay = 20
 $Global:FadeDelay = 15
 $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
 [Diagnostics.Stopwatch]$Global:timer = New-Object Diagnostics.Stopwatch
-
-Add-Type @"
-    using System;
-    using System.Runtime.InteropServices;
-    public class WinAp {
-      [DllImport("user32.dll")]
-      [return: MarshalAs(UnmanagedType.Bool)]
-      public static extern bool SetForegroundWindow(IntPtr hWnd);
-
-      [DllImport("user32.dll")]
-      [return: MarshalAs(UnmanagedType.Bool)]
-      public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    }
-"@
 
 Function SHIFT_KEY {
     param(
@@ -387,7 +372,7 @@ Function Send_Credentials {
         Start-sleep -Milliseconds 100
         [InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
     }
-    # Ожидание, что пользователь отпустит кнопку Ctrl
+    # Waiting for the user to release the Ctrl button
     Start-sleep -Milliseconds 500
 
     $(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)))).ToCharArray() | % { SendKey $_ }
@@ -462,9 +447,6 @@ function DrawButtons {
             Send_Credentials $($This.Name.Substring(7)) $(([System.Windows.Input.Keyboard]::IsKeyDown("LeftCtrl")) -or ([System.Windows.Input.Keyboard]::IsKeyDown("RightCtrl")))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
-        #[System.Windows.Data.Binding]$binding = [System.Windows.Data.Binding]::new("Background")
-        #$binding.Source = $WindowMain_Border
-        #($WindowMain_Grid.Children.Where({$_.Name -eq $Button.Name})).SetBinding([System.Windows.Controls.Border]::BackgroundProperty,$binding) | Out-Null
         $i += 1
     }
 }
@@ -510,7 +492,6 @@ $Global:CurrentEntries = ArrangeEntries
 
 Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
 
-## from https://gist.github.com/selvalogesh/37b99e43b932d42b5a9901a33284b4fa
 [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')       | out-null
 [System.Reflection.Assembly]::LoadWithPartialName('presentationframework')      | out-null
 [System.Reflection.Assembly]::LoadWithPartialName('System.Drawing')          | out-null
@@ -548,9 +529,6 @@ $Main_Tool_Icon.Add_Click({
 })
 
 $Menu_Exit.add_Click({
-    $Global:DBInstances[0].DBMasterKey = $null
-    $Global:DBInstances[1].DBMasterKey = $null
-    $Global:DBInstances[2].DBMasterKey = $null
     $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
     $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")
@@ -558,7 +536,6 @@ $Menu_Exit.add_Click({
     $Window_main.Close()
     [Environment]::Exit(1)
 })
-## from https://gist.github.com/selvalogesh/37b99e43b932d42b5a9901a33284b4fa
 
 function HideWithFadeDelay {
     $Global:timer.Restart()
@@ -570,7 +547,6 @@ function HideWithFadeDelay {
     $newRunspace.SessionStateProxy.SetVariable("SyncHash",$SyncHash)
     $Global:psCmd = [PowerShell]::Create().AddScript({
         Start-Sleep -Seconds $($SyncHash.FadeDelay)
-        #$SyncHash.ConsoleHost.Ui.WriteLine("***")
         If (-Not $SyncHash.Window_Main.IsMouseOver) {
             $SyncHash.Window_Main.Dispatcher.Invoke([action]{ $SyncHash.Window_Main.Opacity = 0.25 }, "Normal")
         }
@@ -652,9 +628,7 @@ $Window_main.Add_MouseEnter({
 })
 
 $Window_main.Add_MouseLeave({
-    if ($Global:FadeAllowed -and ($Window_Main.WindowState -eq "Normal")) {
-        HideWithFadeDelay
-    }
+    if ($Global:FadeAllowed -and ($Window_Main.WindowState -eq "Normal")) { HideWithFadeDelay }
 })
 
 $Window_main.Add_Loaded({
@@ -664,39 +638,32 @@ $Window_main.Add_Loaded({
     $CheckBox_AutoComplete.IsChecked = $Global:CheckBoxes[1]
     Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
 
-    # Установка режима без фокусировки окна
-    Add-Type @"
-                using System;
-                using System.Runtime.InteropServices;
-                public class Window {
-                    [DllImport("user32.dll")]
-                    public static extern int GetWindowLong(IntPtr hwnd, int index);
+    # Set Window with special behaviour - A window does not become the foreground window when the user clicks it.no focusing type on load - without focuse / https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+Add-Type @"
+    using System;
+    using System.Runtime.InteropServices;
+    public class Window {
+        [DllImport("user32.dll")]
+        public static extern int GetWindowLong(IntPtr hwnd, int index);
 
-                    [DllImport("user32.dll")]
-                    public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
-                }
+        [DllImport("user32.dll")]
+        public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
+    }
 "@
     $WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
     [int]$extendedStyle = [Window]::GetWindowLong($WindowHandle, (-20))
     [Window]::SetWindowLong($WindowHandle,-20,0x08000000)
-    #https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga
 })
 
 $Button_Clipboard.add_Click.Invoke({
-    (Get-Clipboard  -Raw).ToCharArray() | % { SendKey $_ }
+    (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
     if ($CheckBox_AutoComplete.IsChecked) {[InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
 })
 
 $Button_Hide.add_Click.Invoke({$Window_main.Hide()})
 
-## from https://gist.github.com/selvalogesh/37b99e43b932d42b5a9901a33284b4fa
-# Force garbage collection just to start slightly lower RAM usage.
 [System.GC]::Collect()
-
-# Create an application context for it to all run within.
-# This helps with responsiveness, especially when clicking Exit.
 $appContext = New-Object System.Windows.Forms.ApplicationContext
 [void][System.Windows.Forms.Application]::Run($appContext)
-## from https://gist.github.com/selvalogesh/37b99e43b932d42b5a9901a33284b4fa
 
 ### SciptEnd
