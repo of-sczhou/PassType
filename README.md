@@ -4,7 +4,7 @@ This graphical script for Windows allows you to work with multiple (up to three 
 
 This script is designed for system adiministrators, it allows printing credentials from KeePass databases to any consoles (VMware vmrc, Microsoft Hyper-V, HP iLo, Dell iDrac, or whatever you use).
 
-Each KeePass entry corresponds to its own button. When a button is pressed, the script programmatically types (like keyboard touches) the login and password into the desired authetication prompt of any digital eintity. Secret information does not fit on the clipboard. Pressing the button with Ctrl only sends the password.
+Each KeePass entry corresponds to its own button. When a button is pressed, the script programmatically types (like keyboard touches) the login and password into the desired authetication prompt. Secret information does not fit on the clipboard. Pressing the button with Ctrl only sends the password.
 
 The script does not require Keepass software installed, local or network access to KeePass databases is sufficient.
 
