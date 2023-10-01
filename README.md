@@ -10,7 +10,4 @@ The script does not require Keepass software installed, local or network access 
 
 To operate the program, an external PowerShell module poshkeepass is used. The original module page can be found at https://github.com/PSKeePass/PoShKeePass. For simplicity, the current version of the poshkeepass module is located in the script folder under the same name.
 
-For anyone who has cloned and tried the script, please post your thoughts and give feedback on Github or my email abonent@hotmail.com.
-I hope you feel the usefulness of this script and mention it in your communication with your colleagues.
-
 Thanks!
