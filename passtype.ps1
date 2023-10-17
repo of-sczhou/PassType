@@ -121,7 +121,7 @@ Try {
     $Global:AttributedEntries = $AppSettings[1].value
     $Global:CheckBoxes = $AppSettings[2].value
 } catch {
-    if (-Not (Get-Item -Path $($ExecDir + "\" + $appName + ".ini") -ErrorAction SilentlyContinue)) {[System.Windows.MessageBox]::Show("Exception occured while reading content of config file. Please check it's content or delete config file and relaunch application.")}
+    if ((Get-Item -Path $($ExecDir + "\" + $appName + ".ini") -ErrorAction SilentlyContinue)) {[System.Windows.MessageBox]::Show("Exception occured while reading content of config file. Please check it's content or delete config file and relaunch application.")}
 }
 
 function PassType_Entrance {
@@ -531,6 +531,7 @@ $Main_Tool_Icon.Add_Click({
 $Menu_Exit.add_Click({
     $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
+    $Global:DBInstances | % {$_.DBMasterKey = $null}
     $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")
     $Window_main.OwnedWindows | % {$_.Close()}
     $Window_main.Close()
