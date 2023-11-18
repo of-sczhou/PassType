@@ -532,6 +532,7 @@ $Menu_Exit.add_Click({
     $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
     $Global:DBInstances | % {$_.DBMasterKey = $null}
+    If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
     $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")
     $Window_main.OwnedWindows | % {$_.Close()}
     $Window_main.Close()
