@@ -7,7 +7,7 @@ Add-Type -AssemblyName System.Windows.Forms
 $ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
 Add-Type -Path $($ExecDir + "\InputManager.dll")
 
-# Hide powershell console (if not running in Powershell ISE)
+# Hide powershell console (if not ruin Powershell ISE)
 if ((Get-Process -PID $pid).ProcessName -ne "powershell_ise") { $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) }
 
 Class DBInstance {
@@ -28,6 +28,30 @@ Class EntryBrief {
 [DBInstance[]]$Global:DBInstances = @()
 [EntryBrief[]]$Global:AttributedEntries = @([EntryBrief]::new())
 [bool[]]$Global:CheckBoxes = @($false,$false)
+
+# Check KeePass Installation presence
+[string]$Global:KeePass_Path = "Portable"
+[System.Collections.ArrayList]$AllSoftware = @()
+$Registry = [microsoft.win32.registrykey]::OpenRemoteBaseKey(‘LocalMachine’,$env:COMPUTERNAME)
+$Registry.OpenSubKey(”SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall").GetSubKeyNames() | % {
+    $SoftwareKey = $Registry.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + $_)
+    $AllSoftware += (New-Object -Type PSObject -Prop @{ ‘DisplayName’ = $SoftwareKey.GetValue("DisplayName") ; ‘DisplayVersion’ = $SoftwareKey.GetValue("DisplayVersion") ; ‘Publisher’ = $SoftwareKey.GetValue("Publisher") ; 'InstallLocation' = $SoftwareKey.GetValue("InstallLocation"); ‘InstallDate’ = $SoftwareKey.GetValue("InstallDate")})
+}
+$Registry.OpenSubKey(”SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall").GetSubKeyNames() | % {
+    $SoftwareKey = $Registry.OpenSubKey(”SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + $_)
+    $AllSoftware += (New-Object -Type PSObject -Prop @{ ‘DisplayName’ = $SoftwareKey.GetValue("DisplayName") ; ‘DisplayVersion’ = $SoftwareKey.GetValue("DisplayVersion") ; ‘Publisher’ = $SoftwareKey.GetValue("Publisher") ; 'InstallLocation' = $SoftwareKey.GetValue("InstallLocation"); ‘InstallDate’ = $SoftwareKey.GetValue("InstallDate")})
+}
+
+$KeePassRecord = $AllSoftware | ? {($_.DisplayName -like "KeePass Password Safe*") -and ($_.Publisher -like "Dominik Reichl")}
+if ($KeePassRecord) {
+    if ($KeePassRecord.Count -gt 1) { # More then one instances of KeePass presents, point to most fresh version
+        $KeePassRecord = $KeePassRecord | ? {$_.DisplayVersion -eq @(($KeePassRecord | measure DisplayVersion -Maximum).Maximum)}
+    }
+    if ((Get-AuthenticodeSignature -FilePath "$(($KeePassRecord).InstallLocation)KeePass.exe").SignerCertificate.Subject -like "E=cert@dominik-reichl.de,*") {
+        $Global:KeePass_Path = "$(($KeePassRecord).InstallLocation)KeePass.exe"
+    }
+}
+# Check KeePass Installation presence
 
 Import-Module -Name $($ExecDir + "\poshkeepass")
 
@@ -102,6 +126,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                 </GridView>
             </ListView.View>
         </ListView>
+        <Button x:Name="Selector_Button_KeePass" Content="KeePass" HorizontalAlignment="Right" Margin="0,1,98,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0"/>
         <Button x:Name="Selector_Button_Apply" Content=" Apply " HorizontalAlignment="Right" Margin="0,1,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0"/>
         <Button x:Name="Selector_Button_Cancel" Content=" Cancel " HorizontalAlignment="Right" Margin="0,1,2,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0"/>
         <Button x:Name="Selector_Button_Up" Content="▲" Background="White" HorizontalAlignment="Left" Height="18" VerticalAlignment="Top" BorderThickness="0" Width="18" Margin="6,1,0,0" Padding="1,-4,1,1"/>
@@ -120,6 +145,7 @@ Try {
     $Global:DBInstances = $AppSettings[0].value
     $Global:AttributedEntries = $AppSettings[1].value
     $Global:CheckBoxes = $AppSettings[2].value
+    If ($Global:KeePass_Path -eq "Portable") {$Global:KeePass_Path = $AppSettings[3]}
 } catch {
     if ((Get-Item -Path $($ExecDir + "\" + $appName + ".ini") -ErrorAction SilentlyContinue)) {[System.Windows.MessageBox]::Show("Exception occured while reading content of config file. Please check it's content or delete config file and relaunch application.")}
 }
@@ -212,6 +238,8 @@ function PassType_Entrance {
     try { $Window_PassType_Entrance = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
     $XAMLWindow_PassType_Entrance.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_PassType_Entrance.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
+    $Window_PassType_Entrance.add_MouseLeftButtonDown({$Window_PassType_Entrance.DragMove()})
+
     $Button_OK.add_Click.Invoke({
         [DBInstance[]]$Global:DBInstances = @()
 
@@ -250,9 +278,9 @@ function PassType_Entrance {
 
     $Button_Quit.add_Click.Invoke({ $Window_PassType_Entrance.Close() ; Exit })
 
-    $TabItem1.Add_GotFocus({ if ($CheckBox_Include_1.IsChecked) {$PasswordBox_MasterKey_1.Focus()} else {$TextBox_DBPath_1.Focus()} })
-    $TabItem2.Add_GotFocus({ if ($CheckBox_Include_2.IsChecked) {$PasswordBox_MasterKey_2.Focus()} else {$TextBox_DBPath_2.Focus()} })
-    $TabItem3.Add_GotFocus({ if ($CheckBox_Include_3.IsChecked) {$PasswordBox_MasterKey_3.Focus()} else {$TextBox_DBPath_3.Focus()} })
+    #$TabItem1.Add_GotFocus({ if ($CheckBox_Include_1.IsChecked) {$PasswordBox_MasterKey_1.Focus()} else {$TextBox_DBPath_1.Focus()} })
+    #$TabItem2.Add_GotFocus({ if ($CheckBox_Include_2.IsChecked) {$PasswordBox_MasterKey_2.Focus()} else {$TextBox_DBPath_2.Focus()} })
+    #$TabItem3.Add_GotFocus({ if ($CheckBox_Include_3.IsChecked) {$PasswordBox_MasterKey_3.Focus()} else {$TextBox_DBPath_3.Focus()} })
 
     $Window_PassType_Entrance.Add_Loaded({
         if ($Global:DBInstances.Count -ne 0) {
@@ -444,6 +472,7 @@ function DrawButtons {
         $Button.Margin = "0,$([string]($i*($Button.Height - 1))),0,0"
         $Button.Background = "Transparent"
         $Button.Add_Click({
+            #[System.Windows.Forms.InputLanguage]::CurrentInputLanguage = [System.Windows.Forms.InputLanguage]::InstalledInputLanguages | ? { $_.Culture -eq 'en-US' }
             Send_Credentials $($This.Name.Substring(7)) $(([System.Windows.Input.Keyboard]::IsKeyDown("LeftCtrl")) -or ([System.Windows.Input.Keyboard]::IsKeyDown("RightCtrl")))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
@@ -533,7 +562,7 @@ $Menu_Exit.add_Click({
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
     $Global:DBInstances | % {$_.DBMasterKey = $null}
     If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
-    $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")
+    $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")
     $Window_main.OwnedWindows | % {$_.Close()}
     $Window_main.Close()
     [Environment]::Exit(1)
@@ -592,6 +621,68 @@ $Selector_Button_Down.Add_Click({
     }
 })
 
+$Selector_Button_KeePass.Add_Click({
+    if ($Global:KeePass_Path -eq "Portable") {
+        $objForm = New-Object System.Windows.Forms.OpenFileDialog
+        $objForm.Title = "Select location of keepass.exe"
+        $objForm.InitialDirectory = $env:SystemDrive
+        $objForm.Filter = "keepass.exe|keepass.exe"
+        $objForm.Multiselect = $false
+        $objForm.ShowDialog()
+        if ($objForm.FileName) {$Global:KeePass_Path = $objForm.FileName}
+    }
+
+    If ($Global:KeePass_Path -ne "Portable") {
+        If (Get-Process -Name KeePass -ea 0) {
+            Start-Process -FilePath $Global:KeePass_Path -ArgumentList @("-exit-all")
+            While (Get-Process -Name KeePass -ea 0) {Start-Sleep -Milliseconds 200}
+        }
+        
+        # Select User XML config for launch Keepass
+        if (Test-Path @($env:APPDATA + "\KeePass\KeePass.config.xml") -ea 0) { # use user's config and modify some nodes
+            [XML]$XML_config = Get-Content -Path @($env:APPDATA + "\KeePass\KeePass.config.xml")
+            Try {
+                If (-Not $XML_config.Configuration.Application.Start.MinimizedAndLocked) {
+                    $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("MinimizedAndLocked")) | Out-Null
+                }$XML_config.Configuration.Application.Start.MinimizedAndLocked = "false"
+            } catch {}
+
+            Try {
+                If (-Not $XML_config.Configuration.Application.Start.OpenLastFile) {
+                    $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("OpenLastFile")) | Out-Null
+                }$XML_config.Configuration.Application.Start.OpenLastFile = "false"
+            } catch {}
+            $XML_config.Save(@($env:TEMP + "\KeePass.config.xml"))
+            $XMLPath = @($env:TEMP + "\KeePass.config.xml")
+        } else {$XMLPath = "$ExecDir\KeePass.config.xml"} # Use config file from script folder
+
+        & $Global:KeePass_Path "-cfg-local:$XMLPath"
+        While (-Not (Get-Process -Name KeePass -ea 0)) {Start-Sleep -Milliseconds 200}
+
+        $Global:DBInstances | ? {$_.Include} | % {
+            Try {
+              Start-Sleep -Seconds 1
+              $KeePassProcess = New-Object System.Diagnostics.Process
+              $KeePassProcess.StartInfo.FileName = $Global:KeePass_Path
+              if ($_.DBKeyPath) {
+                $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-keyfile:$($_.DBKeyPath)","-pw-stdin"
+              } else {
+                $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-pw-stdin"
+              }
+              $KeePassProcess.StartInfo.UseShellExecute = $false
+              $KeePassProcess.StartInfo.RedirectStandardInput = $true
+              $KeePassProcess.Start()
+
+              $StdIn = $KeePassProcess.StandardInput
+              $StdIn.WriteLine($([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($_.DBMasterKey))))
+              While (-Not $KeePassProcess.Responding) {Start-Sleep -Milliseconds 100}
+            } Finally {
+                  if($StdIn) { $StdIn.Close() }
+            }
+        }
+    }
+})
+
 $Selector_Button_Apply.Add_Click({
     $i = 0 ; $OrderNum = 1
     $Global:CurrentEntries | % {
@@ -622,6 +713,7 @@ $CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft
 $CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
 
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
+$Window_Selector.add_MouseLeftButtonDown({$Window_Selector.DragMove()})
 
 $Window_main.Add_MouseEnter({
     Try {$Global:psCmd.Stop() ; $Global:psCmd.Dispose()} catch {}
