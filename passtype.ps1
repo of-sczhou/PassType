@@ -103,7 +103,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        x:Name="Window_Selector" Title="Filter, Order, Refresh" Height="250" Width="650" ResizeMode="CanResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" WindowStartupLocation="CenterScreen">
+        x:Name="Window_Selector" Title="Filter, Order, Refresh" Height="250" Width="650" ResizeMode="CanResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" WindowStartupLocation="CenterScreen" ShowInTaskbar="False">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
     </WindowChrome.WindowChrome>
@@ -115,7 +115,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid HorizontalAlignment="Stretch">
-                                    <CheckBox  IsChecked="{Binding IsVisible}" />
+                                    <CheckBox  IsChecked="{Binding IsVisible}"/>
                                 </Grid>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
@@ -126,18 +126,26 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                 </GridView>
             </ListView.View>
         </ListView>
-        <Button x:Name="Selector_Button_KeePass" Content="KeePass" HorizontalAlignment="Right" Margin="0,1,98,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0"/>
+        <Button x:Name="Selector_Button_KeePass" Content="KeePass" HorizontalAlignment="Right" Margin="0,1,98,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" />
         <Button x:Name="Selector_Button_Apply" Content=" Apply " HorizontalAlignment="Right" Margin="0,1,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0"/>
         <Button x:Name="Selector_Button_Cancel" Content=" Cancel " HorizontalAlignment="Right" Margin="0,1,2,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0"/>
         <Button x:Name="Selector_Button_Up" Content="▲" Background="White" HorizontalAlignment="Left" Height="18" VerticalAlignment="Top" BorderThickness="0" Width="18" Margin="6,1,0,0" Padding="1,-4,1,1"/>
         <Button x:Name="Selector_Button_Down" Content="▼" Background="White" HorizontalAlignment="Left" Height="18" VerticalAlignment="Top" BorderThickness="0" Width="18" Margin="25,0,0,0" Padding="1,4,1,1"/>
-        <Label Content="change order" HorizontalAlignment="Left" Margin="44,-3,0,0" VerticalAlignment="Top"/>
+        <Label Content="order" HorizontalAlignment="Left" Margin="44,-3,0,0" VerticalAlignment="Top"/>
+        <Label Content="search" HorizontalAlignment="Left" Margin="208,-3,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="Selector_Textbox_Search" Text="" HorizontalAlignment="Center" Margin="0,2,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="144" TabIndex="0"/>
+        <Button x:Name="Selector_Button_ClearSearchString" HorizontalAlignment="Right" Margin="0,4,252,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Height="16" Width="16" Visibility="Hidden">
+            <TextBlock  Text="X" Margin="-1,-3,0,0" RenderTransformOrigin="0.5,0.5" Width="8">
+                <TextBlock.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform ScaleY="1" ScaleX="1.65"/>
+                      </TransformGroup>
+                </TextBlock.RenderTransform>
+            </TextBlock>
+        </Button>
     </Grid>
 </Window>
 "@
-$Reader=(New-Object System.Xml.XmlNodeReader $XAMLSelectorWindow)
-try { $Window_Selector = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
-$XAMLSelectorWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Selector.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
 # Read config file if it exists
 Try {
@@ -296,7 +304,7 @@ function PassType_Entrance {
     })
     $Window_PassType_Entrance.Activate() | Out-Null
     $Window_PassType_Entrance.Focus() | Out-Null
-    $Window_PassType_Entrance.ShowDialog()
+    $Window_PassType_Entrance.ShowDialog() | Out-Null
 }
 
 PassType_Entrance
@@ -540,8 +548,11 @@ $contextmenu = New-Object System.Windows.Forms.ContextMenu
 $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
-$Main_Tool_Icon.Add_Click({                    
-    If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
+$Main_Tool_Icon_Click = {
+    Param (
+        $MouseButton
+    )
+    If ($MouseButton.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
         Try {
@@ -555,6 +566,10 @@ $Main_Tool_Icon.Add_Click({
             $Window_main.ShowDialog()
         }
     }
+}
+
+$Main_Tool_Icon.Add_Click({
+    Invoke-Command -ScriptBlock $Main_Tool_Icon_Click -ArgumentList $_.Button
 })
 
 $Menu_Exit.add_Click({
@@ -591,119 +606,145 @@ $Button_Filter.Add_Click({
     $Global:FadeAllowed = $false
     $Global:CurrentEntries = ArrangeEntries
     $Global:CurrentEntriesCopy = $Global:CurrentEntries
+
+    $Reader=(New-Object System.Xml.XmlNodeReader $XAMLSelectorWindow)
+    try { $Window_Selector = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+    $XAMLSelectorWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Selector.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
+    $Window_Selector.add_MouseLeftButtonDown({$Window_Selector.DragMove()})
+
+    $Selector_Textbox_Search.Add_TextChanged({
+        if ($this.Text.Length -ge 2) {
+            [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
+            $ListView_Selector.ItemsSource = @($EntriesMatched)
+        } else {
+            If ($this.Text.Length -eq 0) { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Hidden } else { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Visible }
+            $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+        }
+    })
+
+    $Selector_Button_ClearSearchString.Add_Click({
+        $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+        $Selector_Textbox_Search.Text = ""
+        $Selector_Textbox_Search.Focus()
+    })
+
     $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
     $ListView_Selector.SelectedIndex = 0
-    $Window_Selector.Owner = $Window_main
-    $Window_Selector.Activate() | Out-Null
-    $Window_Selector.Focus()
-    $Window_Selector.ShowDialog()
-})
 
-$Selector_Button_Up.Add_Click({
-    if ($ListView_Selector.SelectedIndex -ne 0) {
-        $Index = $ListView_Selector.SelectedIndex
-        $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex -1]
-        $Global:CurrentEntries[$ListView_Selector.SelectedIndex - 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
-        $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
-        $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
-        $ListView_Selector.SelectedIndex = $Index - 1
-    }
-})
-
-$Selector_Button_Down.Add_Click({
-    if ($ListView_Selector.SelectedIndex -lt ($ListView_Selector.Items.Count - 1)) {
-        $Index = $ListView_Selector.SelectedIndex
-        $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1]
-        $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
-        $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
-        $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
-        $ListView_Selector.SelectedIndex = $Index + 1
-    }
-})
-
-$Selector_Button_KeePass.Add_Click({
-    if ($Global:KeePass_Path -eq "Portable") {
-        $objForm = New-Object System.Windows.Forms.OpenFileDialog
-        $objForm.Title = "Select location of keepass.exe"
-        $objForm.InitialDirectory = $env:SystemDrive
-        $objForm.Filter = "keepass.exe|keepass.exe"
-        $objForm.Multiselect = $false
-        $objForm.ShowDialog()
-        if ($objForm.FileName) {$Global:KeePass_Path = $objForm.FileName}
-    }
-
-    If ($Global:KeePass_Path -ne "Portable") {
-        If (Get-Process -Name KeePass -ea 0) {
-            Start-Process -FilePath $Global:KeePass_Path -ArgumentList @("-exit-all")
-            While (Get-Process -Name KeePass -ea 0) {Start-Sleep -Milliseconds 200}
+    $Selector_Button_Apply.Add_Click({
+        $i = 0 ; $OrderNum = 1
+        $Global:CurrentEntries | % {
+            If ($_.IsVisible) {
+                $Global:CurrentEntries[$i].OrderNum = $OrderNum
+                $OrderNum += 1
+            } else { $Global:CurrentEntries[$i].OrderNum = 0 }
+            $i += 1
         }
+        $Global:AttributedEntries = $Global:CurrentEntries
+
+        DrawButtons
+        $Window_Selector.Close() | Out-Null
+        $Global:FadeAllowed = $true
+    })
+
+    $Selector_Button_Cancel.Add_Click({
+        $Global:CurrentEntries = $Global:CurrentEntriesCopy
+        $Window_Selector.Close()
+        $Global:FadeAllowed = $true
+    })
+
+    $Window_Selector.Add_Loaded({
+        $Window_Selector.Activate() | Out-Null
+        $Selector_Textbox_Search.Focus() | Out-Null
+    })
+
+    $Selector_Button_Up.Add_Click({
+        if ($ListView_Selector.SelectedIndex -ne 0) {
+            $Index = $ListView_Selector.SelectedIndex
+            $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex -1]
+            $Global:CurrentEntries[$ListView_Selector.SelectedIndex - 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
+            $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
+            $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+            $ListView_Selector.SelectedIndex = $Index - 1
+        }
+    })
+
+    $Selector_Button_Down.Add_Click({
+        if ($ListView_Selector.SelectedIndex -lt ($ListView_Selector.Items.Count - 1)) {
+            $Index = $ListView_Selector.SelectedIndex
+            $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1]
+            $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
+            $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
+            $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+            $ListView_Selector.SelectedIndex = $Index + 1
+        }
+    })
+
+    $Selector_Button_KeePass.Add_Click({
+        if ($Global:KeePass_Path -eq "Portable") {
+            $objForm = New-Object System.Windows.Forms.OpenFileDialog
+            $objForm.Title = "Select location of keepass.exe"
+            $objForm.InitialDirectory = $env:SystemDrive
+            $objForm.Filter = "keepass.exe|keepass.exe"
+            $objForm.Multiselect = $false
+            $objForm.ShowDialog()
+            if ($objForm.FileName) {$Global:KeePass_Path = $objForm.FileName}
+        }
+
+        If ($Global:KeePass_Path -ne "Portable") {
+            If (Get-Process -Name KeePass -ea 0) {
+                Start-Process -FilePath $Global:KeePass_Path -ArgumentList @("-exit-all")
+                While (Get-Process -Name KeePass -ea 0) {Start-Sleep -Milliseconds 200}
+            }
         
-        # Select User XML config for launch Keepass
-        if (Test-Path @($env:APPDATA + "\KeePass\KeePass.config.xml") -ea 0) { # use user's config and modify some nodes
-            [XML]$XML_config = Get-Content -Path @($env:APPDATA + "\KeePass\KeePass.config.xml")
-            Try {
-                If (-Not $XML_config.Configuration.Application.Start.MinimizedAndLocked) {
-                    $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("MinimizedAndLocked")) | Out-Null
-                }$XML_config.Configuration.Application.Start.MinimizedAndLocked = "false"
-            } catch {}
+            # Select User XML config for launch Keepass
+            if (Test-Path @($env:APPDATA + "\KeePass\KeePass.config.xml") -ea 0) { # use user's config and modify some nodes
+                [XML]$XML_config = Get-Content -Path @($env:APPDATA + "\KeePass\KeePass.config.xml")
+                Try {
+                    If (-Not $XML_config.Configuration.Application.Start.MinimizedAndLocked) {
+                        $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("MinimizedAndLocked")) | Out-Null
+                    }$XML_config.Configuration.Application.Start.MinimizedAndLocked = "false"
+                } catch {}
 
-            Try {
-                If (-Not $XML_config.Configuration.Application.Start.OpenLastFile) {
-                    $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("OpenLastFile")) | Out-Null
-                }$XML_config.Configuration.Application.Start.OpenLastFile = "false"
-            } catch {}
-            $XML_config.Save(@($env:TEMP + "\KeePass.config.xml"))
-            $XMLPath = @($env:TEMP + "\KeePass.config.xml")
-        } else {$XMLPath = "$ExecDir\KeePass.config.xml"} # Use config file from script folder
+                Try {
+                    If (-Not $XML_config.Configuration.Application.Start.OpenLastFile) {
+                        $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("OpenLastFile")) | Out-Null
+                    }$XML_config.Configuration.Application.Start.OpenLastFile = "false"
+                } catch {}
+                $XML_config.Save(@($env:TEMP + "\KeePass.config.xml"))
+                $XMLPath = @($env:TEMP + "\KeePass.config.xml")
+            } else {$XMLPath = "$ExecDir\KeePass.config.xml"} # Use config file from script folder
 
-        & $Global:KeePass_Path "-cfg-local:$XMLPath"
-        While (-Not (Get-Process -Name KeePass -ea 0)) {Start-Sleep -Milliseconds 200}
+            & $Global:KeePass_Path "-cfg-local:$XMLPath"
+            While (-Not (Get-Process -Name KeePass -ea 0)) {Start-Sleep -Milliseconds 200}
 
-        $Global:DBInstances | ? {$_.Include} | % {
-            Try {
-              Start-Sleep -Seconds 1
-              $KeePassProcess = New-Object System.Diagnostics.Process
-              $KeePassProcess.StartInfo.FileName = $Global:KeePass_Path
-              if ($_.DBKeyPath) {
-                $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-keyfile:$($_.DBKeyPath)","-pw-stdin"
-              } else {
-                $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-pw-stdin"
-              }
-              $KeePassProcess.StartInfo.UseShellExecute = $false
-              $KeePassProcess.StartInfo.RedirectStandardInput = $true
-              $KeePassProcess.Start()
+            $Global:DBInstances | ? {$_.Include} | % {
+                Try {
+                  Start-Sleep -Seconds 1
+                  $KeePassProcess = New-Object System.Diagnostics.Process
+                  $KeePassProcess.StartInfo.FileName = $Global:KeePass_Path
+                  if ($_.DBKeyPath) {
+                    $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-keyfile:$($_.DBKeyPath)","-pw-stdin"
+                  } else {
+                    $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-pw-stdin"
+                  }
+                  $KeePassProcess.StartInfo.UseShellExecute = $false
+                  $KeePassProcess.StartInfo.RedirectStandardInput = $true
+                  $KeePassProcess.Start()
 
-              $StdIn = $KeePassProcess.StandardInput
-              $StdIn.WriteLine($([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($_.DBMasterKey))))
-              While (-Not $KeePassProcess.Responding) {Start-Sleep -Milliseconds 100}
-            } Finally {
-                  if($StdIn) { $StdIn.Close() }
+                  $StdIn = $KeePassProcess.StandardInput
+                  $StdIn.WriteLine($([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($_.DBMasterKey))))
+                  While (-Not $KeePassProcess.Responding) {Start-Sleep -Milliseconds 100}
+                } Finally {
+                      if($StdIn) { $StdIn.Close() }
+                }
             }
         }
-    }
-})
+    })
 
-$Selector_Button_Apply.Add_Click({
-    $i = 0 ; $OrderNum = 1
-    $Global:CurrentEntries | % {
-        If ($_.IsVisible) {
-            $Global:CurrentEntries[$i].OrderNum = $OrderNum
-            $OrderNum += 1
-        } else { $Global:CurrentEntries[$i].OrderNum = 0 }
-        $i += 1
-    }
-    $Global:AttributedEntries = $Global:CurrentEntries
-
-    DrawButtons
-    
-    $Window_Selector.Hide() | Out-Null
-    $Global:FadeAllowed = $true
-})
-
-$Selector_Button_Cancel.Add_Click({
-    $Global:CurrentEntries = $Global:CurrentEntriesCopy
-    $Window_Selector.Hide()
-    $Global:FadeAllowed = $true
+    $Window_Selector.Owner = $Window_main
+    $Window_Selector.ShowDialog()
 })
 
 $Window_main.Top = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height) - $Window_main.Height
@@ -713,7 +754,6 @@ $CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft
 $CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
 
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
-$Window_Selector.add_MouseLeftButtonDown({$Window_Selector.DragMove()})
 
 $Window_main.Add_MouseEnter({
     Try {$Global:psCmd.Stop() ; $Global:psCmd.Dispose()} catch {}
