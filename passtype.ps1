@@ -59,7 +59,7 @@ Import-Module -Name $($ExecDir + "\poshkeepass")
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    Title="PassType" Height="67" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" Topmost="{Binding ElementName=CheckBox_AlwaysOnTop, Path=IsChecked}">
+    Title="PassType" Height="67" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" Topmost="{Binding ElementName=CheckBox_AlwaysOnTop, Path=IsChecked}" WindowStartupLocation="CenterScreen">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
     </WindowChrome.WindowChrome>
@@ -114,7 +114,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid HorizontalAlignment="Stretch">
-                                    <CheckBox  IsChecked="{Binding IsVisible}"/>
+                                    <CheckBox IsChecked="{Binding IsVisible}"/>
                                 </Grid>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
@@ -311,6 +311,10 @@ $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
 [Diagnostics.Stopwatch]$Global:timer = New-Object Diagnostics.Stopwatch
 
+Function SaveConfiguration {
+    $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
+}
+
 Function SHIFT_KEY {
     param(
         [string]$KEY
@@ -337,8 +341,8 @@ Function SendKey {
     )
     
     Switch -regex -CaseSensitive ($KEY) {
-        '^[A-Z]' { SHIFT_KEY $KEY }
-        '^[a-z]' { [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) }
+        '[A-Z]$' { SHIFT_KEY $KEY }
+        '[a-z]$' { [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) }
         '^[0-9]' { [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::("D"+$KEY)) ; [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::("D" + $KEY)) }
         DEFAULT {
             Switch ($KEY) {
@@ -377,6 +381,16 @@ Function SendKey {
                 " " {SINGLE_KEY "Space"}
                 "`n" {SINGLE_KEY "Enter"}
                 "`t" {SINGLE_KEY "Tab"}
+                "F1" {SINGLE_KEY "F1"}
+                "F2" {SINGLE_KEY "F2"}
+                "F3" {SINGLE_KEY "F3"}
+                "F4" {SINGLE_KEY "F4"}
+                "F5" {SINGLE_KEY "F5"}
+                "F6" {SINGLE_KEY "F6"}
+                "F7" {SINGLE_KEY "F7"}
+                "F8" {SINGLE_KEY "F8"}
+                "F9" {SINGLE_KEY "F9"}
+                "F10" {SINGLE_KEY "F10"}
                 DEFAULT {}
             }
         }
@@ -584,7 +598,7 @@ $Menu_Exit.add_Click({
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
     $Global:DBInstances | % {$_.DBMasterKey = $null}
     If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
-    $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")
+    SaveConfiguration
     $Window_main.OwnedWindows | % {$_.Close()}
     $Window_main.Close()
     [Environment]::Exit(1)
@@ -649,8 +663,8 @@ $Button_Filter.Add_Click({
             $i += 1
         }
         $Global:AttributedEntries = $Global:CurrentEntries
-
         DrawButtons
+        SaveConfiguration
         $Window_Selector.Close() | Out-Null
         $Global:FadeAllowed = $true
     })
@@ -756,8 +770,11 @@ $Button_Filter.Add_Click({
 $Window_main.Top = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height) - $Window_main.Height
 $Window_main.Left = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Width) - $Window_main.Width
 
-$CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) })
-$CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
+$CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) ; SaveConfiguration })
+$CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName ; SaveConfiguration })
+
+$CheckBox_AlwaysOnTop.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
+$CheckBox_AutoComplete.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
 
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
 
@@ -795,7 +812,13 @@ Add-Type @"
 })
 
 $Button_Clipboard.add_Click.Invoke({
-    (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
+    If ((Get-Clipboard -Raw) -match '[fF]\d{1,2};') {
+        [regex]::Matches($(Get-Clipboard -Raw),"[fF]\d{1,2};") | % {
+            SendKey $(($_.Value).TrimEnd(";"))
+        }
+    } else {
+        (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
+    }
     if ($CheckBox_AutoComplete.IsChecked) {[InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
 })
 
