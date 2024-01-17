@@ -312,7 +312,15 @@ $Global:FadeAllowed = $true
 [Diagnostics.Stopwatch]$Global:timer = New-Object Diagnostics.Stopwatch
 
 Function SaveConfiguration {
-    $Global:DBInstances,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
+    $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
+    $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
+    [SecureString[]]$DBMasterKeys = @()
+    $Global:DBInstances | % {$DBMasterKeys += $_.DBMasterKey}
+    $Global:DBInstances | % {$_.DBMasterKey = $null}
+    If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
+    $DBInstances,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
+    for ($i=0; $i -lt 3; $i++) { $Global:DBInstances[$i].DBMasterKey = $DBMasterKeys[$i]}
+    ""
 }
 
 Function SHIFT_KEY {
@@ -594,11 +602,8 @@ $Main_Tool_Icon.Add_Click({
 })
 
 $Menu_Exit.add_Click({
-    $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
-    $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
-    $Global:DBInstances | % {$_.DBMasterKey = $null}
-    If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
     SaveConfiguration
+    $Global:DBInstances | % {$_.DBMasterKey = $null}
     $Window_main.OwnedWindows | % {$_.Close()}
     $Window_main.Close()
     [Environment]::Exit(1)
@@ -663,6 +668,7 @@ $Button_Filter.Add_Click({
             $i += 1
         }
         $Global:AttributedEntries = $Global:CurrentEntries
+
         DrawButtons
         SaveConfiguration
         $Window_Selector.Close() | Out-Null
@@ -770,8 +776,8 @@ $Button_Filter.Add_Click({
 $Window_main.Top = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height) - $Window_main.Height
 $Window_main.Left = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Width) - $Window_main.Width
 
-$CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) ; SaveConfiguration })
-$CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName ; SaveConfiguration })
+$CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) })
+$CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
 
 $CheckBox_AlwaysOnTop.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
 $CheckBox_AutoComplete.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
