@@ -314,13 +314,11 @@ $Global:FadeAllowed = $true
 Function SaveConfiguration {
     $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
-    [SecureString[]]$DBMasterKeys = @()
-    $Global:DBInstances | % {$DBMasterKeys += $_.DBMasterKey}
-    $Global:DBInstances | % {$_.DBMasterKey = $null}
+    [DBInstance[]]$DBInstancesOut = @()
+    $DBInstancesOut += $Global:DBInstances
+    $DBInstancesOut | % {$_.DBMasterKey = $null}
     If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
-    $DBInstances,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
-    for ($i=0; $i -lt 3; $i++) { $Global:DBInstances[$i].DBMasterKey = $DBMasterKeys[$i]}
-    ""
+    $DBInstancesOut,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
 }
 
 Function SHIFT_KEY {
@@ -818,11 +816,11 @@ Add-Type @"
 })
 
 $Button_Clipboard.add_Click.Invoke({
-    If ((Get-Clipboard -Raw) -match '[fF]\d{1,2};') {
+    If ((Get-Clipboard -Raw) -match '[fF]\d{1,2};') { # Typing functional keys from clipboard, format Fn; - examples F2;F8;F10;
         [regex]::Matches($(Get-Clipboard -Raw),"[fF]\d{1,2};") | % {
             SendKey $(($_.Value).TrimEnd(";"))
         }
-    } else {
+    } else {# Typing non Fn keys
         (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
     }
     if ($CheckBox_AutoComplete.IsChecked) {[InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
