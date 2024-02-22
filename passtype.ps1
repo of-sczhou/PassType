@@ -315,7 +315,14 @@ Function SaveConfiguration {
     $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
     [DBInstance[]]$DBInstancesOut = @()
-    $DBInstancesOut += $Global:DBInstances
+    $Global:DBInstances | % {
+        [DBInstance]$TempItem = New-Object -TypeName DBInstance
+        $TempItem.DBPath = $_.DBPath
+        $TempItem.DBKeyPath = $_.DBKeyPath
+        $TempItem.Include = $_.Include
+        
+        $DBInstancesOut += $TempItem
+    }
     $DBInstancesOut | % {$_.DBMasterKey = $null}
     If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
     $DBInstancesOut,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
