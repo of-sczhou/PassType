@@ -1,4 +1,4 @@
-﻿$appVersion = "1.0.0.0"
+﻿$appVersion = "1.1.0.0"
 $appName = "PassType"
 
 Add-Type -AssemblyName PresentationFramework
@@ -6,7 +6,7 @@ Add-Type -AssemblyName System.Windows.Forms
 $ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
 Add-Type -Path $($ExecDir + "\InputManager.dll")
 
-# Hide powershell console (if not ruin Powershell ISE)
+# Hide powershell console (if not run Powershell ISE)
 if ((Get-Process -PID $pid).ProcessName -ne "powershell_ise") { $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) }
 
 Class DBInstance {
@@ -59,7 +59,7 @@ Import-Module -Name $($ExecDir + "\poshkeepass")
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    Title="PassType" Height="67" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" Topmost="{Binding ElementName=CheckBox_AlwaysOnTop, Path=IsChecked}" WindowStartupLocation="CenterScreen">
+    Title="PassType" Height="67" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" Topmost="{Binding ElementName=CheckBox_AlwaysOnTop, Path=IsChecked}" WindowStartupLocation="CenterScreen" Opacity="0">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
     </WindowChrome.WindowChrome>
@@ -145,6 +145,11 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
     </Grid>
 </Window>
 "@
+
+Function WindowMain_FadeAnimation {
+    Param ($From,$To,$DurationSec)
+    $Window_main.BeginAnimation([System.Windows.Window]::OpacityProperty, $([System.Windows.Media.Animation.DoubleAnimation]::new($From,$To,$(New-TimeSpan -Seconds $DurationSec))))
+}
 
 # Read config file if it exists
 Try {
@@ -306,10 +311,9 @@ PassType_Entrance
 
 # Common variables, objects
 $Global:Delay = 20
-$Global:FadeDelay = 15
+$FadeDelay = 15
 $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
-[Diagnostics.Stopwatch]$Global:timer = New-Object Diagnostics.Stopwatch
 
 Function SaveConfiguration {
     $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
@@ -426,7 +430,7 @@ Function Send_Credentials {
 
     Start-sleep -Milliseconds 100
 
-    # Type enty name, TAB and password
+    # Type entry name, TAB and password
     If (-Not $Shift) {
         if (-Not $Ctrl) { # type entry if not Ctrl pressed
             $Entry.UserName.ToCharArray() | % { SendKey $_ }
@@ -589,16 +593,8 @@ $Main_Tool_Icon_Click = {
     If ($MouseButton.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
-        Try {
-            $Global:psCmd.Stop() ; $Global:psCmd.Dispose()
-        } catch {}
-        $Global:timer.Stop()
-        if ($Window_main.Opacity -ne 1) {$Window_main.Opacity = 1}
-        if ($Global:FadeAllowed) { HideWithFadeDelay }
-        $Window_main.Activate()
-        If (-Not $Window_main.IsVisible) {
-            $Window_main.ShowDialog()
-        }
+        WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
+        $Global:FadeAllowed = $true
     }
 }
 
@@ -613,25 +609,6 @@ $Menu_Exit.add_Click({
     $Window_main.Close()
     [Environment]::Exit(1)
 })
-
-function HideWithFadeDelay {
-    $Global:timer.Restart()
-    $SyncHash = [hashtable]::Synchronized(@{Window_Main = $Window_Main; Timer = $Global:timer; FadeDelay = $Global:FadeDelay ; ConsoleHost = (Get-Host)})
-    $newRunspace =[runspacefactory]::CreateRunspace()
-    $newRunspace.ApartmentState = "STA"
-    $newRunspace.ThreadOptions = "Default"         
-    $newRunspace.Open()
-    $newRunspace.SessionStateProxy.SetVariable("SyncHash",$SyncHash)
-    $Global:psCmd = [PowerShell]::Create().AddScript({
-        Start-Sleep -Seconds $($SyncHash.FadeDelay)
-        If (-Not $SyncHash.Window_Main.IsMouseOver) {
-            $SyncHash.Window_Main.Dispatcher.Invoke([action]{ $SyncHash.Window_Main.Opacity = 0.25 }, "Normal")
-        }
-        $SyncHash.Window_Main.Dispatcher.Invoke([action]{ $SyncHash.Timer.Stop() }, "Normal")
-    })
-    $Global:psCmd.Runspace = $newRunspace
-    $Global:psCmd.BeginInvoke()
-}
 
 $Button_Filter.Add_Click({
     $Global:FadeAllowed = $false
@@ -790,14 +767,54 @@ $CheckBox_AutoComplete.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTo
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
 
 $Window_main.Add_MouseEnter({
-    Try {$Global:psCmd.Stop() ; $Global:psCmd.Dispose()} catch {}
-    $Global:timer.Stop()
-    if ($Window_main.Opacity -ne 1) {$Window_main.Opacity = 1}
+    If ($Window_main.Opacity -ne 1) { WindowMain_FadeAnimation -From $Window_main.Opacity -to 2 -DurationSec 0.6 }
 })
 
 $Window_main.Add_MouseLeave({
-    if ($Global:FadeAllowed -and ($Window_Main.WindowState -eq "Normal")) { HideWithFadeDelay }
+    If ($Global:FadeAllowed) { WindowMain_FadeAnimation -From $Window_main.Opacity*2 -to 0.25 -DurationSec 0.6 }
 })
+
+$Button_Clipboard.add_Click.Invoke({
+    If ((Get-Clipboard -Raw) -match '[fF]\d{1,2};') { # Typing functional keys from clipboard, format Fn; - examples F2;F8;F10;
+        [regex]::Matches($(Get-Clipboard -Raw),"[fF]\d{1,2};") | % {
+            SendKey $(($_.Value).TrimEnd(";"))
+        }
+    } else {# Typing non Fn keys
+        (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
+    }
+    if ($CheckBox_AutoComplete.IsChecked) {[InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
+})
+
+$Button_Hide.add_Click.Invoke({$Global:FadeAllowed = $False ; WindowMain_FadeAnimation -From 2 -to -1 -DurationSec 0.6})
+
+<#
+#Background thread for Timer events
+$SyncHash = [hashtable]::Synchronized(@{Window_Main = $Window_Main; Opacity = $Window_Main.Opacity; Timer = $Timer; ConsoleHost = (Get-Host)})
+$newRunspace =[runspacefactory]::CreateRunspace()
+$newRunspace.ApartmentState = "STA"
+$newRunspace.ThreadOptions = "Default"         
+$newRunspace.Open()
+$newRunspace.SessionStateProxy.SetVariable("SyncHash",$SyncHash)
+$psCmd = [PowerShell]::Create().AddScript({
+    Try {
+        $objectEventArgs = @{
+            InputObject = $SyncHash.Timer
+            EventName = 'Elapsed'
+            SourceIdentifier = 'Timer.Elapsed'
+            Action = {
+                If (-Not $SyncHash.Window_Main.IsMouseOver) {
+                    $SyncHash.ConsoleHost.Ui.WriteLine("Current Window Opacity: $($SyncHash.Opacity)")
+                    $SyncHash.Window_Main.Dispatcher.Invoke([action]{ $SyncHash.Window_Main.Opacity = 0.25 }, "Normal")
+                }
+            }
+        }
+        Register-ObjectEvent @objectEventArgs
+    } catch {$SyncHash.ConsoleHost.Ui.WriteLine("Exception: $_")}
+    #Do {Start-Sleep -Seconds 1} Until ($Something)
+})
+$psCmd.Runspace = $newRunspace
+$psCmd.BeginInvoke()
+#>
 
 $Window_main.Add_Loaded({
     $Window_main.Title = $appName + " v." + $appVersion
@@ -820,20 +837,12 @@ Add-Type @"
     $WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
     [int]$extendedStyle = [Window]::GetWindowLong($WindowHandle, (-20))
     [Window]::SetWindowLong($WindowHandle,-20,0x08000000)
+
+    WindowMain_FadeAnimation -From 0 -to 1 -DurationSec 0.6
 })
 
-$Button_Clipboard.add_Click.Invoke({
-    If ((Get-Clipboard -Raw) -match '[fF]\d{1,2};') { # Typing functional keys from clipboard, format Fn; - examples F2;F8;F10;
-        [regex]::Matches($(Get-Clipboard -Raw),"[fF]\d{1,2};") | % {
-            SendKey $(($_.Value).TrimEnd(";"))
-        }
-    } else {# Typing non Fn keys
-        (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
-    }
-    if ($CheckBox_AutoComplete.IsChecked) {[InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
-})
-
-$Button_Hide.add_Click.Invoke({$Window_main.Hide()})
+$Window_main.Activate()
+$Window_main.ShowDialog()
 
 [System.GC]::Collect()
 $appContext = New-Object System.Windows.Forms.ApplicationContext
