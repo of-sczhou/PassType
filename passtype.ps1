@@ -311,7 +311,6 @@ PassType_Entrance
 
 # Common variables, objects
 $Global:Delay = 20
-$FadeDelay = 15
 $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
 
@@ -771,7 +770,14 @@ $Window_main.Add_MouseEnter({
 })
 
 $Window_main.Add_MouseLeave({
-    If ($Global:FadeAllowed) { WindowMain_FadeAnimation -From $Window_main.Opacity*2 -to 0.25 -DurationSec 0.6 }
+    If ($Global:FadeAllowed) {
+        $Animation = [System.Windows.Media.Animation.DoubleAnimation]::new()
+        $Animation.From = $Window_main.Opacity
+        $Animation.To = 0.25
+        $Animation.BeginTime = New-TimeSpan -Seconds 15
+        $Animation.Duration = New-TimeSpan -Seconds 0.6
+        $Window_main.BeginAnimation([System.Windows.Window]::OpacityProperty, $Animation)
+    }
 })
 
 $Button_Clipboard.add_Click.Invoke({
