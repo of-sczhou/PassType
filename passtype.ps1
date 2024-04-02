@@ -1,4 +1,4 @@
-﻿$appVersion = "1.1.0.0"
+﻿$appVersion = "1.2.0.0"
 $appName = "PassType"
 
 Add-Type -AssemblyName PresentationFramework
@@ -23,6 +23,21 @@ Class EntryBrief {
     [Int32]$OrderNum
     [bool]$IsVisible
 }
+
+Add-Type @"
+  using System;
+  using System.Runtime.InteropServices;
+  public class SystemWindowsFunctions {
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern int GetWindowLong(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll")]
+    public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
+}
+"@
 
 [DBInstance[]]$Global:DBInstances = @()
 [EntryBrief[]]$Global:AttributedEntries = @([EntryBrief]::new())
@@ -585,20 +600,17 @@ $contextmenu = New-Object System.Windows.Forms.ContextMenu
 $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
-$Main_Tool_Icon_Click = {
-    Param (
-        $MouseButton
-    )
-    If ($MouseButton.Button -eq [Windows.Forms.MouseButtons]::Right) {
+$Main_Tool_Icon.Add_Click({
+    $ActiveWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+    # Set NotifyIcon never getting focus - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+    [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($ActiveWindowHandle, (-20))
+    [SystemWindowsFunctions]::SetWindowLong($ActiveWindowHandle,-20,0x08000000)
+    If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
     }
-}
-
-$Main_Tool_Icon.Add_Click({
-    Invoke-Command -ScriptBlock $Main_Tool_Icon_Click -ArgumentList $_.Button
 })
 
 $Menu_Exit.add_Click({
@@ -793,56 +805,17 @@ $Button_Clipboard.add_Click.Invoke({
 
 $Button_Hide.add_Click.Invoke({$Global:FadeAllowed = $False ; WindowMain_FadeAnimation -From 2 -to -1 -DurationSec 0.6})
 
-<#
-#Background thread for Timer events
-$SyncHash = [hashtable]::Synchronized(@{Window_Main = $Window_Main; Opacity = $Window_Main.Opacity; Timer = $Timer; ConsoleHost = (Get-Host)})
-$newRunspace =[runspacefactory]::CreateRunspace()
-$newRunspace.ApartmentState = "STA"
-$newRunspace.ThreadOptions = "Default"         
-$newRunspace.Open()
-$newRunspace.SessionStateProxy.SetVariable("SyncHash",$SyncHash)
-$psCmd = [PowerShell]::Create().AddScript({
-    Try {
-        $objectEventArgs = @{
-            InputObject = $SyncHash.Timer
-            EventName = 'Elapsed'
-            SourceIdentifier = 'Timer.Elapsed'
-            Action = {
-                If (-Not $SyncHash.Window_Main.IsMouseOver) {
-                    $SyncHash.ConsoleHost.Ui.WriteLine("Current Window Opacity: $($SyncHash.Opacity)")
-                    $SyncHash.Window_Main.Dispatcher.Invoke([action]{ $SyncHash.Window_Main.Opacity = 0.25 }, "Normal")
-                }
-            }
-        }
-        Register-ObjectEvent @objectEventArgs
-    } catch {$SyncHash.ConsoleHost.Ui.WriteLine("Exception: $_")}
-    #Do {Start-Sleep -Seconds 1} Until ($Something)
-})
-$psCmd.Runspace = $newRunspace
-$psCmd.BeginInvoke()
-#>
-
 $Window_main.Add_Loaded({
     $Window_main.Title = $appName + " v." + $appVersion
     $CheckBox_AlwaysOnTop.IsChecked = $Global:CheckBoxes[0]
     $CheckBox_AutoComplete.IsChecked = $Global:CheckBoxes[1]
     Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
 
-    # Set Window special behaviour - A window does not become the foreground window when the user clicks it - without focuse https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
-Add-Type @"
-    using System;
-    using System.Runtime.InteropServices;
-    public class Window {
-        [DllImport("user32.dll")]
-        public static extern int GetWindowLong(IntPtr hwnd, int index);
-
-        [DllImport("user32.dll")]
-        public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
-    }
-"@
     $WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
-    [int]$extendedStyle = [Window]::GetWindowLong($WindowHandle, (-20))
-    [Window]::SetWindowLong($WindowHandle,-20,0x08000000)
+    
+    # Set Window never getting focus after activation ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+    [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($WindowHandle, (-20))
+    [SystemWindowsFunctions]::SetWindowLong($WindowHandle,-20,0x08000000)
 
     WindowMain_FadeAnimation -From 0 -to 1 -DurationSec 0.6
 })
