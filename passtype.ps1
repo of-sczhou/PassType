@@ -442,7 +442,7 @@ Function Send_Credentials {
         If ($TryGetEntry) {$Entry = $TryGetEntry}
     }
 
-    Start-sleep -Milliseconds 100
+    ## Start-sleep -Milliseconds 100
 
     # Type entry name, TAB and password
     If (-Not $Shift) {
@@ -452,7 +452,7 @@ Function Send_Credentials {
             [InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
         }
         # Waiting for the user to release the Ctrl button
-        Start-sleep -Milliseconds 500
+        Start-sleep -Milliseconds 400
 
         $(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)))).ToCharArray() | % { SendKey $_ }
     }
