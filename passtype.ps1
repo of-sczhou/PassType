@@ -4,6 +4,8 @@ $appName = "PassType"
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 $ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
+
+# Imported from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
 Add-Type -Path $($ExecDir + "\InputManager.dll")
 
 # Hide powershell console (if not run Powershell ISE)
@@ -282,7 +284,7 @@ function PassType_Entrance {
         if (($PasswordBox_MasterKey_2.Password -ne "") -and $Global:DBInstances[1].Include) {$Global:DBInstances[1].DBMasterKey = $(ConvertTo-SecureString $($PasswordBox_MasterKey_2.Password) -AsPlainText -Force)}
         if (($PasswordBox_MasterKey_3.Password -ne "") -and $Global:DBInstances[2].Include) {$Global:DBInstances[2].DBMasterKey = $(ConvertTo-SecureString $($PasswordBox_MasterKey_3.Password) -AsPlainText -Force)}
         
-        #Check Connection
+        #Check the connections
         $AuthOK = $true
         $Global:DBInstances | ? {$_.Include} | % {
             Try {
@@ -451,8 +453,8 @@ Function Send_Credentials {
             Start-sleep -Milliseconds 100
             [InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
         }
-        # Waiting for the user to release the Ctrl button
-        Start-sleep -Milliseconds 400
+        # Waiting for the user to release the Ctrl button after click
+        Start-sleep -Milliseconds 300
 
         $(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)))).ToCharArray() | % { SendKey $_ }
     }
@@ -532,7 +534,7 @@ function DrawButtons {
         $Button.Background = "Transparent"
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
-            #[System.Windows.Forms.InputLanguage]::CurrentInputLanguage = [System.Windows.Forms.InputLanguage]::InstalledInputLanguages | ? { $_.Culture -eq 'en-US' }
+            ##[System.Windows.Forms.InputLanguage]::CurrentInputLanguage = [System.Windows.Forms.InputLanguage]::InstalledInputLanguages | ? { $_.Culture -eq 'en-US' }
             Send_Credentials $($This.Name.Substring(7)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
@@ -581,8 +583,8 @@ $Global:CurrentEntries = ArrangeEntries
 
 Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
 
-[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')       | out-null
-[System.Reflection.Assembly]::LoadWithPartialName('presentationframework')      | out-null
+[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')    | out-null
+[System.Reflection.Assembly]::LoadWithPartialName('presentationframework')   | out-null
 [System.Reflection.Assembly]::LoadWithPartialName('System.Drawing')          | out-null
 [System.Reflection.Assembly]::LoadWithPartialName('WindowsFormsIntegration') | out-null
 
@@ -601,16 +603,21 @@ $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
 $Main_Tool_Icon.Add_Click({
+    
+    <#
     $ActiveWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
     # Set NotifyIcon never getting focus - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
     [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($ActiveWindowHandle, (-20))
     [SystemWindowsFunctions]::SetWindowLong($ActiveWindowHandle,-20,0x08000000)
+    #>
+
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
     }
+
 })
 
 $Menu_Exit.add_Click({
@@ -777,9 +784,7 @@ $CheckBox_AutoComplete.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTo
 
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
 
-$Window_main.Add_MouseEnter({
-    If ($Window_main.Opacity -ne 1) { WindowMain_FadeAnimation -From $Window_main.Opacity -to 2 -DurationSec 0.6 }
-})
+$Window_main.Add_MouseEnter({ If ($Window_main.Opacity -ne 1) { WindowMain_FadeAnimation -From $Window_main.Opacity -to 2 -DurationSec 0.6 } })
 
 $Window_main.Add_MouseLeave({
     If ($Global:FadeAllowed) {
@@ -793,6 +798,7 @@ $Window_main.Add_MouseLeave({
 })
 
 $Button_Clipboard.add_Click.Invoke({
+    Start-Sleep -Milliseconds 400
     If ((Get-Clipboard -Raw) -match '[fF]\d{1,2};') { # Typing functional keys from clipboard, format Fn; - examples F2;F8;F10;
         [regex]::Matches($(Get-Clipboard -Raw),"[fF]\d{1,2};") | % {
             SendKey $(($_.Value).TrimEnd(";"))
@@ -813,7 +819,7 @@ $Window_main.Add_Loaded({
 
     $WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
     
-    # Set Window never getting focus after activation ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+    # Set Window never getting focus after activation - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
     [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($WindowHandle, (-20))
     [SystemWindowsFunctions]::SetWindowLong($WindowHandle,-20,0x08000000)
 
