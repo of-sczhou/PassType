@@ -6,7 +6,7 @@ Add-Type -AssemblyName System.Windows.Forms
 $ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
 
 # Imported from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
-Add-Type -Path $($ExecDir + "\InputManager.dll")
+#Add-Type -Path $($ExecDir + "\InputManager.dll")
 
 # Hide powershell console (if not run Powershell ISE)
 if ((Get-Process -PID $pid).ProcessName -ne "powershell_ise") { $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) }
@@ -40,6 +40,280 @@ Add-Type @"
     public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
 }
 "@
+
+Add-Type @"
+    Imports System
+    Imports System.Windows.Forms
+    Imports System.Runtime
+    Imports System.Runtime.InteropServices
+    Imports System.Threading
+    ''' <summary>
+    ''' Provide methods to send keyboard input that also works in DirectX games.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class Keyboard
+    #Region "API Declaring"
+    #Region "SendInput"
+        Private Declare Function SendInput Lib "user32.dll" (ByVal cInputs As Integer, ByRef pInputs As INPUT, ByVal cbSize As Integer) As Integer
+        Private Structure INPUT
+            Dim dwType As Integer
+            Dim mkhi As MOUSEKEYBDHARDWAREINPUT
+        End Structure
+
+        Private Structure KEYBDINPUT
+            Public wVk As Short
+            Public wScan As Short
+            Public dwFlags As Integer
+            Public time As Integer
+            Public dwExtraInfo As IntPtr
+        End Structure
+
+        Private Structure HARDWAREINPUT
+            Public uMsg As Integer
+            Public wParamL As Short
+            Public wParamH As Short
+        End Structure
+
+        <StructLayout(LayoutKind.Explicit)>
+        Private Structure MOUSEKEYBDHARDWAREINPUT
+            <FieldOffset(0)> Public mi As MOUSEINPUT
+            <FieldOffset(0)> Public ki As KEYBDINPUT
+            <FieldOffset(0)> Public hi As HARDWAREINPUT
+        End Structure
+
+        Private Structure MOUSEINPUT
+            Public dx As Integer
+            Public dy As Integer
+            Public mouseData As Integer
+            Public dwFlags As Integer
+            Public time As Integer
+            Public dwExtraInfo As IntPtr
+        End Structure
+
+        Const INPUT_MOUSE As UInt32 = 0
+        Const INPUT_KEYBOARD As Integer = 1
+        Const INPUT_HARDWARE As Integer = 2
+        Const KEYEVENTF_EXTENDEDKEY As UInt32 = &H1
+        Const KEYEVENTF_KEYUP As UInt32 = &H2
+        Const KEYEVENTF_UNICODE As UInt32 = &H4
+        Const KEYEVENTF_SCANCODE As UInt32 = &H8
+        Const XBUTTON1 As UInt32 = &H1
+        Const XBUTTON2 As UInt32 = &H2
+        Const MOUSEEVENTF_MOVE As UInt32 = &H1
+        Const MOUSEEVENTF_LEFTDOWN As UInt32 = &H2
+        Const MOUSEEVENTF_LEFTUP As UInt32 = &H4
+        Const MOUSEEVENTF_RIGHTDOWN As UInt32 = &H8
+        Const MOUSEEVENTF_RIGHTUP As UInt32 = &H10
+        Const MOUSEEVENTF_MIDDLEDOWN As UInt32 = &H20
+        Const MOUSEEVENTF_MIDDLEUP As UInt32 = &H40
+        Const MOUSEEVENTF_XDOWN As UInt32 = &H80
+        Const MOUSEEVENTF_XUP As UInt32 = &H100
+        Const MOUSEEVENTF_WHEEL As UInt32 = &H800
+        Const MOUSEEVENTF_VIRTUALDESK As UInt32 = &H4000
+        Const MOUSEEVENTF_ABSOLUTE As UInt32 = &H8000
+    #End Region
+        Private Declare Auto Function MapVirtualKey Lib "user32.dll" (ByVal uCode As UInt32, ByVal uMapType As MapVirtualKeyMapTypes) As UInt32
+        Private Declare Auto Function MapVirtualKeyEx Lib "user32.dll" (ByVal uCode As UInt32, ByVal uMapType As MapVirtualKeyMapTypes, ByVal dwhkl As IntPtr) As UInt32
+        Private Declare Auto Function GetKeyboardLayout Lib "user32.dll" (ByVal idThread As UInteger) As IntPtr
+        ''' <summary>The set of valid MapTypes used in MapVirtualKey
+        ''' </summary>
+        ''' <remarks></remarks>
+        Public Enum MapVirtualKeyMapTypes As UInt32
+            ''' <summary>uCode is a virtual-key code and is translated into a scan code.
+            ''' If it is a virtual-key code that does not distinguish between left- and
+            ''' right-hand keys, the left-hand scan code is returned.
+            ''' If there is no translation, the function returns 0.
+            ''' </summary>
+            ''' <remarks></remarks>
+            MAPVK_VK_TO_VSC = &H0
+
+            ''' <summary>uCode is a scan code and is translated into a virtual-key code that
+            ''' does not distinguish between left- and right-hand keys. If there is no
+            ''' translation, the function returns 0.
+            ''' </summary>
+            ''' <remarks></remarks>
+            MAPVK_VSC_TO_VK = &H1
+
+            ''' <summary>uCode is a virtual-key code and is translated into an unshifted
+            ''' character value in the low-order word of the return value. Dead keys (diacritics)
+            ''' are indicated by setting the top bit of the return value. If there is no
+            ''' translation, the function returns 0.
+            ''' </summary>
+            ''' <remarks></remarks>
+            MAPVK_VK_TO_CHAR = &H2
+
+            ''' <summary>Windows NT/2000/XP: uCode is a scan code and is translated into a
+            ''' virtual-key code that distinguishes between left- and right-hand keys. If
+            ''' there is no translation, the function returns 0.
+            ''' </summary>
+            ''' <remarks></remarks>
+            MAPVK_VSC_TO_VK_EX = &H3
+
+            ''' <summary>Not currently documented
+            ''' </summary>
+            ''' <remarks></remarks>
+            MAPVK_VK_TO_VSC_EX = &H4
+        End Enum
+    #End Region
+        Private Shared Function GetScanKey(ByVal VKey As UInteger) As ScanKey
+            Dim ScanCode As UInteger = MapVirtualKey(VKey, MapVirtualKeyMapTypes.MAPVK_VK_TO_VSC)
+            Dim Extended As Boolean = (VKey = Keys.RMenu Or VKey = Keys.RControlKey Or VKey = Keys.Left Or VKey = Keys.Right Or VKey = Keys.Up Or VKey = Keys.Down Or VKey = Keys.Home Or VKey = Keys.Delete Or VKey = Keys.PageUp Or VKey = Keys.PageDown Or VKey = Keys.End Or VKey = Keys.Insert Or VKey = Keys.NumLock Or VKey = Keys.PrintScreen Or VKey = Keys.Divide)
+            Return New ScanKey(ScanCode, Extended)
+        End Function
+        Private Structure ScanKey
+            Dim ScanCode As UInteger
+            Dim Extended As Boolean
+            Public Sub New(ByVal sCode As UInteger, Optional ByVal ex As Boolean = False)
+                ScanCode = sCode
+                Extended = ex
+            End Sub
+        End Structure
+        ''' <summary>
+        ''' Sends shortcut keys (key down and up) signals.
+        ''' </summary>
+        ''' <param name="kCode">The array of keys to send as a shortcut.</param>
+        ''' <param name="Delay">The delay in milliseconds between the key down and up events.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub ShortcutKeys(ByVal kCode() As Keys, Optional ByVal Delay As Integer = 0)
+            Dim KeysPress As New KeyPressStruct(kCode, Delay)
+            Dim t As New Thread(New ParameterizedThreadStart(AddressOf KeyPressThread))
+            t.Start(KeysPress)
+        End Sub
+        ''' <summary>
+        ''' Sends a key down signal.
+        ''' </summary>
+        ''' <param name="kCode">The virtual keycode to send.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub KeyDown(ByVal kCode As Keys)
+            Dim sKey As ScanKey = GetScanKey(kCode)
+            Dim input As New INPUT()
+            input.dwType = INPUT_KEYBOARD
+            input.mkhi.ki = New KEYBDINPUT()
+            input.mkhi.ki.wScan = sKey.ScanCode
+            input.mkhi.ki.dwExtraInfo = IntPtr.Zero
+            input.mkhi.ki.dwFlags = KEYEVENTF_SCANCODE Or Microsoft.VisualBasic.Interaction.IIf(sKey.Extended, KEYEVENTF_EXTENDEDKEY, Nothing)
+            Dim cbSize As Integer = Marshal.SizeOf(GetType(INPUT))
+            SendInput(1, input, cbSize)
+        End Sub
+        ''' <summary>
+        ''' Sends a key up signal.
+        ''' </summary>
+        ''' <param name="kCode">The virtual keycode to send.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub KeyUp(ByVal kCode As Keys)
+            Dim sKey As ScanKey = GetScanKey(kCode)
+            Dim input As New INPUT()
+            input.dwType = INPUT_KEYBOARD
+            input.mkhi.ki = New KEYBDINPUT()
+            input.mkhi.ki.wScan = sKey.ScanCode
+            input.mkhi.ki.dwExtraInfo = IntPtr.Zero
+            input.mkhi.ki.dwFlags = KEYEVENTF_SCANCODE Or KEYEVENTF_KEYUP Or Microsoft.VisualBasic.Interaction.IIf(sKey.Extended, KEYEVENTF_EXTENDEDKEY, Nothing)
+            Dim cbSize As Integer = Marshal.SizeOf(GetType(INPUT))
+            SendInput(1, input, cbSize)
+        End Sub
+        ''' <summary>
+        ''' Sends a key press signal (key down and up).
+        ''' </summary>
+        ''' <param name="kCode">The virtual keycode to send.</param>
+        ''' <param name="Delay">The delay to set between the key down and up commands.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub KeyPress(ByVal kCode As Keys, Optional ByVal Delay As Integer = 0)
+            Dim SendKeys() As Keys = {kCode}
+            Dim KeysPress As New KeyPressStruct(SendKeys, Delay)
+            Dim t As New Thread(New ParameterizedThreadStart(AddressOf KeyPressThread))
+            t.Start(KeysPress)
+        End Sub
+        Private Shared Sub KeyPressThread(ByVal KeysP As KeyPressStruct)
+            For Each k As Keys In KeysP.Keys
+                KeyDown(k)
+            Next
+            If KeysP.Delay > 0 Then Thread.Sleep(KeysP.Delay)
+            For Each k As Keys In KeysP.Keys
+                KeyUp(k)
+            Next
+        End Sub
+        Private Structure KeyPressStruct
+            Dim Keys() As Keys
+            Dim Delay As Integer
+            Public Sub New(ByVal KeysToPress() As Keys, Optional ByVal DelayTime As Integer = 0)
+                Keys = KeysToPress
+                Delay = DelayTime
+            End Sub
+        End Structure
+    End Class
+    ''' <summary>
+    ''' Provides methods to send keyboard input. The keys are being sent virtually and cannot be used with DirectX.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Class VirtualKeyboard
+    #Region "API Declaring"
+        <DllImport("user32.dll", CallingConvention:=CallingConvention.StdCall,
+               CharSet:=CharSet.Unicode, EntryPoint:="keybd_event",
+               ExactSpelling:=True, SetLastError:=True)>
+        Public Shared Function keybd_event(ByVal bVk As Int32, ByVal bScan As Int32,
+                                  ByVal dwFlags As Int32, ByVal dwExtraInfo As Int32) As Boolean
+        End Function
+        Const KEYEVENTF_EXTENDEDKEY = &H1
+        Const KEYEVENTF_KEYUP = &H2
+    #End Region
+        ''' <summary>
+        ''' Sends shortcut keys (key down and up) signals.
+        ''' </summary>
+        ''' <param name="kCode">The array of keys to send as a shortcut.</param>
+        ''' <param name="Delay">The delay in milliseconds between the key down and up events.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub ShortcutKeys(ByVal kCode() As Keys, Optional ByVal Delay As Integer = 0)
+            Dim KeyPress As New KeyPressStruct(kCode, Delay)
+            Dim t As New Thread(New ParameterizedThreadStart(AddressOf KeyPressThread))
+            t.Start(KeyPress)
+        End Sub
+        ''' <summary>
+        ''' Sends a key down signal.
+        ''' </summary>
+        ''' <param name="kCode">The virtual keycode to send.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub KeyDown(ByVal kCode As Keys)
+            keybd_event(kCode, 0, 0, 0)
+        End Sub
+        ''' <summary>
+        ''' Sends a key up signal.
+        ''' </summary>
+        ''' <param name="kCode">The virtual keycode to send.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub KeyUp(ByVal kCode As Keys)
+            keybd_event(kCode, 0, KEYEVENTF_KEYUP, 0)
+        End Sub
+        ''' <summary>
+        ''' Sends a key press signal (key down and up).
+        ''' </summary>
+        ''' <param name="kCode">The virtual key code to send.</param>
+        ''' <param name="Delay">The delay to set between the key down and up commands.</param>
+        ''' <remarks></remarks>
+        Public Shared Sub KeyPress(ByVal kCode As Keys, Optional ByVal Delay As Integer = 0)
+            Dim SendKeys() As Keys = {kCode}
+            Dim KeyPress As New KeyPressStruct(SendKeys, Delay)
+            Dim t As New Thread(New ParameterizedThreadStart(AddressOf KeyPressThread))
+            t.Start(KeyPress)
+        End Sub
+        Private Shared Sub KeyPressThread(ByVal KeysP As KeyPressStruct)
+            For Each k As Keys In KeysP.Keys
+                KeyDown(k)
+            Next
+            If KeysP.Delay > 0 Then Thread.Sleep(KeysP.Delay)
+            For Each k As Keys In KeysP.Keys
+                KeyUp(k)
+            Next
+        End Sub
+        Private Structure KeyPressStruct
+            Dim Keys() As Keys
+            Dim Delay As Integer
+            Public Sub New(ByVal KeysToPress() As Keys, Optional ByVal DelayTime As Integer = 0)
+                Keys = KeysToPress
+                Delay = DelayTime
+            End Sub
+        End Structure
+    End Class
+"@ -Language VisualBasic -ReferencedAssemblies System.Windows.Forms
 
 [DBInstance[]]$Global:DBInstances = @()
 [EntryBrief[]]$Global:AttributedEntries = @([EntryBrief]::new())
@@ -353,10 +627,10 @@ Function SHIFT_KEY {
         [string]$KEY
     )
 
-    [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
-    [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
 }
 
 Function SINGLE_KEY {
@@ -364,8 +638,8 @@ Function SINGLE_KEY {
         [string]$KEY
     )
 
-    [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
 }
 
 Function SendKey {
@@ -375,8 +649,8 @@ Function SendKey {
     
     Switch -regex -CaseSensitive ($KEY) {
         '[A-Z]$' { SHIFT_KEY $KEY }
-        '[a-z]$' { [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) }
-        '^[0-9]' { [InputManager.Keyboard]::KeyDown([System.Windows.Forms.Keys]::("D"+$KEY)) ; [InputManager.Keyboard]::KeyUp([System.Windows.Forms.Keys]::("D" + $KEY)) }
+        '[a-z]$' { [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) }
+        '^[0-9]' { [Keyboard]::KeyDown([System.Windows.Forms.Keys]::("D"+$KEY)) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::("D" + $KEY)) }
         DEFAULT {
             Switch ($KEY) {
                 "~" { SHIFT_KEY "Oem3" }
@@ -451,7 +725,7 @@ Function Send_Credentials {
         if (-Not $Ctrl) { # type entry if not Ctrl pressed
             $Entry.UserName.ToCharArray() | % { SendKey $_ }
             Start-sleep -Milliseconds 100
-            [InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
+            [Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
         }
         # Waiting for the user to release the Ctrl button after click
         Start-sleep -Milliseconds 300
@@ -463,7 +737,7 @@ Function Send_Credentials {
 
     if ($Shift -and $Ctrl) { Start $Entry.URL } # entry URL open
 
-    if ($CheckBox_AutoComplete.IsChecked) {[InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
+    if ($CheckBox_AutoComplete.IsChecked) {[Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
     Return
 }
 
@@ -806,7 +1080,7 @@ $Button_Clipboard.add_Click.Invoke({
     } else {# Typing non Fn keys
         (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
     }
-    if ($CheckBox_AutoComplete.IsChecked) {[InputManager.Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
+    if ($CheckBox_AutoComplete.IsChecked) {[Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
 })
 
 $Button_Hide.add_Click.Invoke({$Global:FadeAllowed = $False ; WindowMain_FadeAnimation -From 2 -to -1 -DurationSec 0.6})
