@@ -5,9 +5,6 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 $ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
 
-# Imported from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
-#Add-Type -Path $($ExecDir + "\InputManager.dll")
-
 # Hide powershell console (if not run Powershell ISE)
 if ((Get-Process -PID $pid).ProcessName -ne "powershell_ise") { $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) }
 
@@ -41,6 +38,7 @@ Add-Type @"
 }
 "@
 
+# Imported from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
 Add-Type @"
     Imports System
     Imports System.Windows.Forms
@@ -718,8 +716,6 @@ Function Send_Credentials {
         If ($TryGetEntry) {$Entry = $TryGetEntry}
     }
 
-    ## Start-sleep -Milliseconds 100
-
     # Type entry name, TAB and password
     If (-Not $Shift) {
         if (-Not $Ctrl) { # type entry if not Ctrl pressed
@@ -808,7 +804,6 @@ function DrawButtons {
         $Button.Background = "Transparent"
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
-            ##[System.Windows.Forms.InputLanguage]::CurrentInputLanguage = [System.Windows.Forms.InputLanguage]::InstalledInputLanguages | ? { $_.Culture -eq 'en-US' }
             Send_Credentials $($This.Name.Substring(7)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
@@ -877,21 +872,12 @@ $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
 $Main_Tool_Icon.Add_Click({
-    
-    <#
-    $ActiveWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
-    # Set NotifyIcon never getting focus - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
-    [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($ActiveWindowHandle, (-20))
-    [SystemWindowsFunctions]::SetWindowLong($ActiveWindowHandle,-20,0x08000000)
-    #>
-
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
     }
-
 })
 
 $Menu_Exit.add_Click({
