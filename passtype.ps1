@@ -5,6 +5,9 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 $ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
 
+# Imported from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
+#Add-Type -Path $($ExecDir + "\InputManager.dll")
+
 # Hide powershell console (if not run Powershell ISE)
 if ((Get-Process -PID $pid).ProcessName -ne "powershell_ise") { $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) }
 
@@ -38,7 +41,6 @@ Add-Type @"
 }
 "@
 
-# Imported from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
 Add-Type @"
     Imports System
     Imports System.Windows.Forms
@@ -352,31 +354,32 @@ Import-Module -Name $($ExecDir + "\poshkeepass")
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
     </WindowChrome.WindowChrome>
-    <Border x:Name="WindowMain_Border" CornerRadius="7" BorderBrush="#FF263238" BorderThickness="1" Background="#FF9FC4D6">
+    <Border x:Name="WindowMain_Border" CornerRadius="7" BorderBrush="#FF263238" BorderThickness="1" Background="Transparent">
         <Grid x:Name="WindowMain_Grid">
-            <Button x:Name="Button_Hide" Background="Transparent" HorizontalAlignment="Right" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0,0,0,2" BorderBrush="Black" Margin="0,4,4,0"/>
-            <Button x:Name="Button_Filter" Content="..." Background="Transparent" HorizontalAlignment="Left" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0" BorderBrush="Black" Margin="7,4,0,0" FontWeight="Bold" FontSize="16">
+            <Button x:Name="Button_Hide" Background="Transparent" HorizontalAlignment="Right" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0,0,0,2" BorderBrush="#FF263238" Margin="0,4,4,0"/>
+            <Button x:Name="Button_Filter" Content="..." Background="Transparent" HorizontalAlignment="Left" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0" BorderBrush="Black" Margin="7,4,0,0" FontWeight="Bold" FontSize="16" Foreground="#FF263238">
                 <Button.ToolTip>
                     <ToolTip>Filter, Order, Refresh</ToolTip>
                 </Button.ToolTip>
             </Button>
-            <CheckBox x:Name="CheckBox_AlwaysOnTop" HorizontalAlignment="Left" Margin="34,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="Black">
+            <CheckBox x:Name="CheckBox_AlwaysOnTop" HorizontalAlignment="Left" Margin="34,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="#FF263238">
                 <CheckBox.ToolTip>
                     <ToolTip>Always on Top</ToolTip>
                 </CheckBox.ToolTip>
             </CheckBox>
-            <CheckBox x:Name="CheckBox_AutoRun" HorizontalAlignment="Left" Margin="55,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="Black">
+            <CheckBox x:Name="CheckBox_AutoRun" HorizontalAlignment="Left" Margin="55,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="#FF263238">
                 <CheckBox.ToolTip>
                     <ToolTip>Autorun</ToolTip>
                 </CheckBox.ToolTip>
             </CheckBox>
-            <CheckBox x:Name="CheckBox_AutoComplete" HorizontalAlignment="Left" Margin="76,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="Black">
+            <CheckBox x:Name="CheckBox_AutoComplete" HorizontalAlignment="Left" Margin="76,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="#FF263238">
                 <CheckBox.ToolTip>
                     <ToolTip>Auto Complete</ToolTip>
                 </CheckBox.ToolTip>
             </CheckBox>
             <Grid x:Name="WindowMain_KPButtons_Grid" Margin="0,29,0,0"/>
-            <Button x:Name="Button_Clipboard" Content="Clipboard" Margin="6,0,6,5" VerticalAlignment="Bottom" Background="Transparent" BorderBrush="Black" Height="20" HorizontalAlignment="Stretch"/>
+            <Rectangle Fill="#FFBECDD4" Height="12" Margin="6,0,6,28" VerticalAlignment="Bottom" Opacity="0.3" Width="117"/>
+            <Button x:Name="Button_Clipboard" Content="Clipboard" Margin="6,0,6,5" VerticalAlignment="Bottom" Background="Transparent" BorderBrush="#FF263238" BorderThickness="1" Height="20" HorizontalAlignment="Stretch" Foreground="#FF263238"/>
         </Grid>
     </Border>
 </Window>
@@ -716,6 +719,8 @@ Function Send_Credentials {
         If ($TryGetEntry) {$Entry = $TryGetEntry}
     }
 
+    ## Start-sleep -Milliseconds 100
+
     # Type entry name, TAB and password
     If (-Not $Shift) {
         if (-Not $Ctrl) { # type entry if not Ctrl pressed
@@ -801,7 +806,10 @@ function DrawButtons {
         $Button.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Stretch
         $Button.Height = 20 
         $Button.Margin = "6,$( [string]($i * ($Button.Height - 1)) ),6,5"
+        $Button.Foreground = "#FF263238"
         $Button.Background = "Transparent"
+        $Button.BorderBrush = "#FF263238"
+        If($i -eq ($EntriesSorted.Count - 1)) {$Button.BorderThickness = 1} else {$Button.BorderThickness = "1,1,1,0"}
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
             Send_Credentials $($This.Name.Substring(7)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)))
@@ -872,18 +880,27 @@ $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
 $Main_Tool_Icon.Add_Click({
+    
+    <#
+    $ActiveWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+    # Set NotifyIcon never getting focus - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+    [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($ActiveWindowHandle, (-20))
+    [SystemWindowsFunctions]::SetWindowLong($ActiveWindowHandle,-20,0x08000000)
+    #>
+
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
     }
+
 })
 
 $Menu_Exit.add_Click({
     SaveConfiguration
     $Global:DBInstances | % {$_.DBMasterKey = $null}
-    $Window_main.OwnedWindows | % {$_.Close()}
+    DOyL8a-1%4:3"nMxV9zE!&L)5"3gChi0.OwnedWindows | % {$_.Close()}
     $Window_main.Close()
     [Environment]::Exit(1)
 })
