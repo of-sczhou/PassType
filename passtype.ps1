@@ -1,15 +1,15 @@
-﻿$appVersion = "1.2.0.0"
+﻿$appVersion = "1.2.1.0"
 $appName = "PassType"
 
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
-$ExecDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
 
-# Imported from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
-#Add-Type -Path $($ExecDir + "\InputManager.dll")
-
-# Hide powershell console (if not run Powershell ISE)
-if ((Get-Process -PID $pid).ProcessName -ne "powershell_ise") { $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) }
+if (-Not (Get-Variable psISE -ea 0)) {
+    $null = $(Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' -name Win32ShowWindowAsync -namespace Win32Functions -PassThru)::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) # Hide powershell console
+    $ExecDir = $MyInvocation.MyCommand.Path.Substring(0,$($MyInvocation.MyCommand.Path.LastIndexOf("\")))
+} else {
+    $ExecDir = $psISE.CurrentFile.FullPath.Substring(0,$($psISE.CurrentFile.FullPath.LastIndexOf("\")))
+}
 
 Class DBInstance {
     [string]$DBPath
@@ -38,9 +38,19 @@ Add-Type @"
 
     [DllImport("user32.dll")]
     public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    public static void BringToFront(IntPtr handle)
+    {
+        SetForegroundWindow(handle);
+    }
 }
 "@
 
+# from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
 Add-Type @"
     Imports System
     Imports System.Windows.Forms
@@ -318,6 +328,7 @@ Add-Type @"
 [DBInstance[]]$Global:DBInstances = @()
 [EntryBrief[]]$Global:AttributedEntries = @([EntryBrief]::new())
 [bool[]]$Global:CheckBoxes = @($false,$false)
+$Global:FromWindowHandle = $null # Handle of window wich is active when we click application NotifyIcon in system tray
 
 # Check KeePass Installation presence
 [string]$Global:KeePass_Path = "Portable"
@@ -337,9 +348,7 @@ if ($KeePassRecord) {
     if ($KeePassRecord.Count -gt 1) { # More then one instances of KeePass presents, point to most fresh version
         $KeePassRecord = $KeePassRecord | ? {$_.DisplayVersion -eq @(($KeePassRecord | measure DisplayVersion -Maximum).Maximum)}
     }
-    if ((Get-AuthenticodeSignature -FilePath "$(($KeePassRecord).InstallLocation)KeePass.exe").SignerCertificate.Subject -like "E=cert@dominik-reichl.de,*") {
-        $Global:KeePass_Path = "$(($KeePassRecord).InstallLocation)KeePass.exe"
-    }
+    $Global:KeePass_Path = "$(($KeePassRecord).InstallLocation)KeePass.exe"
 }
 # Check KeePass Installation presence
 
@@ -354,7 +363,7 @@ Import-Module -Name $($ExecDir + "\poshkeepass")
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
     </WindowChrome.WindowChrome>
-    <Border x:Name="WindowMain_Border" CornerRadius="7" BorderBrush="#FF263238" BorderThickness="1" Background="Transparent">
+    <Border x:Name="WindowMain_Border" CornerRadius="7" BorderBrush="#FF263238" BorderThickness="1" Background="#FF9FC4D6">
         <Grid x:Name="WindowMain_Grid">
             <Button x:Name="Button_Hide" Background="Transparent" HorizontalAlignment="Right" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0,0,0,2" BorderBrush="#FF263238" Margin="0,4,4,0"/>
             <Button x:Name="Button_Filter" Content="..." Background="Transparent" HorizontalAlignment="Left" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0" BorderBrush="Black" Margin="7,4,0,0" FontWeight="Bold" FontSize="16" Foreground="#FF263238">
@@ -445,13 +454,13 @@ Function WindowMain_FadeAnimation {
 
 # Read config file if it exists
 Try {
-    $AppSettings = Get-Content -Path $($ExecDir + "\" + $appName + ".ini") -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
-    $Global:DBInstances = $AppSettings[0].value
-    $Global:AttributedEntries = $AppSettings[1].value
-    $Global:CheckBoxes = $AppSettings[2].value
-    If ($Global:KeePass_Path -eq "Portable") {$Global:KeePass_Path = $AppSettings[3]}
+    $AppSettings = Get-Content -Path $($ExecDir + "\" + $appName + ".ini") -Raw -ea 0 | ConvertFrom-Json
+    If ($Global:KeePass_Path -eq "Portable") {$Global:KeePass_Path = $AppSettings[0]}
+    $Global:CheckBoxes = $AppSettings[1].value
+    $Global:DBInstances = $AppSettings[2].value
+    $Global:AttributedEntries = $AppSettings[3].value
 } catch {
-    if ((Get-Item -Path $($ExecDir + "\" + $appName + ".ini") -ErrorAction SilentlyContinue)) {[System.Windows.MessageBox]::Show("Exception occured while reading content of config file. Please check it's content or delete config file and relaunch application.")}
+    #if ((Get-Item -Path $($ExecDir + "\" + $appName + ".ini") -ErrorAction SilentlyContinue)) {[System.Windows.MessageBox]::Show("Exception occured while reading content of config file. Please check it's content or delete config file and relaunch application.")}
 }
 
 function PassType_Entrance {
@@ -599,7 +608,7 @@ function PassType_Entrance {
     $Window_PassType_Entrance.ShowDialog() | Out-Null
 }
 
-PassType_Entrance
+If ($AppSettings) {PassType_Entrance}
 
 # Common variables, objects
 $Global:Delay = 20
@@ -620,7 +629,7 @@ Function SaveConfiguration {
     }
     $DBInstancesOut | % {$_.DBMasterKey = $null}
     If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
-    $DBInstancesOut,$Global:CurrentEntries,$Global:CheckBoxes,$Global:KeePass_Path | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
+    $Global:KeePass_Path,$Global:CheckBoxes,$DBInstancesOut,$Global:CurrentEntries | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
 }
 
 Function SHIFT_KEY {
@@ -879,28 +888,32 @@ $contextmenu = New-Object System.Windows.Forms.ContextMenu
 $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
-$Main_Tool_Icon.Add_Click({
-    
-    <#
-    $ActiveWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
-    # Set NotifyIcon never getting focus - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
-    [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($ActiveWindowHandle, (-20))
-    [SystemWindowsFunctions]::SetWindowLong($ActiveWindowHandle,-20,0x08000000)
-    #>
+$Main_Tool_Icon.Add_MouseMove({
+    $Global:FromWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+})
 
-    If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
+$Main_Tool_Icon.Add_MouseClick({
+    param
+    (
+      [Parameter(Mandatory)][Object]$sender,
+      [Parameter(Mandatory)][System.Windows.Forms.MouseEventArgs]$e
+    )
+    #$e.Handled = $true
+    #if (-Not $Global:NotifyIconIsNonfocusable) { [SystemWindowsFunctions]::SetWindowLong($([SystemWindowsFunctions]::GetForegroundWindow()),-20,0x08000000) ; $Global:NotifyIconIsNonfocusable = $true }
+    [SystemWindowsFunctions]::BringToFront($Global:FromWindowHandle)
+    If ($e.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
+        
     }
-
 })
 
 $Menu_Exit.add_Click({
     SaveConfiguration
     $Global:DBInstances | % {$_.DBMasterKey = $null}
-    DOyL8a-1%4:3"nMxV9zE!&L)5"3gChi0.OwnedWindows | % {$_.Close()}
+    $Window_main.OwnedWindows | % {$_.Close()}
     $Window_main.Close()
     [Environment]::Exit(1)
 })
@@ -1056,8 +1069,8 @@ $Window_main.Left = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Wi
 $CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) })
 $CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
 
-$CheckBox_AlwaysOnTop.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
-$CheckBox_AutoComplete.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
+#$CheckBox_AlwaysOnTop.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
+#$CheckBox_AutoComplete.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
 
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
 
@@ -1094,10 +1107,10 @@ $Window_main.Add_Loaded({
     $CheckBox_AutoComplete.IsChecked = $Global:CheckBoxes[1]
     Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
 
-    $WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
+    #$WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
     
     # Set Window never getting focus after activation - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
-    [int]$extendedStyle = [SystemWindowsFunctions]::GetWindowLong($WindowHandle, (-20))
+    $WindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
     [SystemWindowsFunctions]::SetWindowLong($WindowHandle,-20,0x08000000)
 
     WindowMain_FadeAnimation -From 0 -to 1 -DurationSec 0.6
