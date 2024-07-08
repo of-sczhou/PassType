@@ -28,7 +28,33 @@ Class EntryBrief {
 
 Add-Type @"
   using System;
+  using System.Drawing;
   using System.Runtime.InteropServices;
+  using System.Windows.Forms;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int X;
+        public int Y;
+
+        public POINT(int x, int y)
+        {
+            this.X = x;
+            this.Y = y;
+        }
+
+        public static implicit operator System.Drawing.Point(POINT p)
+        {
+            return new System.Drawing.Point(p.X, p.Y);
+        }
+
+        public static implicit operator POINT(System.Drawing.Point p)
+        {
+            return new POINT(p.X, p.Y);
+        }
+    }
+
   public class SystemWindowsFunctions {
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
@@ -43,12 +69,15 @@ Add-Type @"
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr WindowFromPoint(POINT Point);
+
     public static void BringToFront(IntPtr handle)
     {
         SetForegroundWindow(handle);
     }
 }
-"@
+"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing
 
 # from https://www.codeproject.com/Articles/117657/InputManager-library-Track-user-input-and-simulate
 Add-Type @"
@@ -328,7 +357,8 @@ Add-Type @"
 [DBInstance[]]$Global:DBInstances = @()
 [EntryBrief[]]$Global:AttributedEntries = @([EntryBrief]::new())
 [bool[]]$Global:CheckBoxes = @($false,$false)
-$Global:FromWindowHandle = $null # Handle of window wich is active when we click application NotifyIcon in system tray
+$Global:PreviousWindowHandle = $null # Handle of window wich is active when we click application NotifyIcon in system tray
+$Global:NotifyIconIsNonfocusable = $false
 
 # Check KeePass Installation presence
 [string]$Global:KeePass_Path = "Portable"
@@ -889,24 +919,28 @@ $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
 $Main_Tool_Icon.Add_MouseMove({
-    $Global:FromWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+    if (-Not $Global:NotifyIconIsNonfocusable) {
+        $Global:PreviousWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+    }
 })
 
-$Main_Tool_Icon.Add_MouseClick({
-    param
-    (
-      [Parameter(Mandatory)][Object]$sender,
-      [Parameter(Mandatory)][System.Windows.Forms.MouseEventArgs]$e
-    )
-    #$e.Handled = $true
-    #if (-Not $Global:NotifyIconIsNonfocusable) { [SystemWindowsFunctions]::SetWindowLong($([SystemWindowsFunctions]::GetForegroundWindow()),-20,0x08000000) ; $Global:NotifyIconIsNonfocusable = $true }
-    [SystemWindowsFunctions]::BringToFront($Global:FromWindowHandle)
-    If ($e.Button -eq [Windows.Forms.MouseButtons]::Right) {
+$Main_Tool_Icon.Add_Click({
+    
+    #[SystemWindowsFunctions]::BringToFront($Global:PreviousWindowHandle)
+    If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
+        if (-Not $Global:NotifyIconIsNonfocusable) {
+            #$TrayIconWindowHandle = [SystemWindowsFunctions]::WindowFromPoint([System.Windows.Forms.Cursor]::Position)
+            $ForegroundWindoHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+            [SystemWindowsFunctions]::SetWindowLong($ForegroundWindoHandle,-20,0x08000000)
+            
+            $Global:NotifyIconIsNonfocusable = $true
+            [SystemWindowsFunctions]::BringToFront($Global:PreviousWindowHandle)
+            [SystemWindowsFunctions]::SetWindowLong($Global:PreviousWindowHandle,-20,0x00000000)
+        }
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
-        
     }
 })
 
