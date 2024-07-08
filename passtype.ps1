@@ -925,17 +925,15 @@ $Main_Tool_Icon.Add_MouseMove({
 })
 
 $Main_Tool_Icon.Add_Click({
-    
-    #[SystemWindowsFunctions]::BringToFront($Global:PreviousWindowHandle)
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
         if (-Not $Global:NotifyIconIsNonfocusable) {
-            #$TrayIconWindowHandle = [SystemWindowsFunctions]::WindowFromPoint([System.Windows.Forms.Cursor]::Position)
+            $Global:NotifyIconIsNonfocusable = $true
+
             $ForegroundWindoHandle = [SystemWindowsFunctions]::GetForegroundWindow()
             [SystemWindowsFunctions]::SetWindowLong($ForegroundWindoHandle,-20,0x08000000)
-            
-            $Global:NotifyIconIsNonfocusable = $true
+
             [SystemWindowsFunctions]::BringToFront($Global:PreviousWindowHandle)
             [SystemWindowsFunctions]::SetWindowLong($Global:PreviousWindowHandle,-20,0x00000000)
         }
