@@ -414,7 +414,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                x:Name="Window_Selector" Title="Filter, Order, Refresh" Height="250" Width="508" ResizeMode="NoResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" WindowStartupLocation="CenterScreen" ShowInTaskbar="False">
+        x:Name="Window_Selector" Title="Options" Height="250" Width="508" ResizeMode="NoResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
 <WindowChrome.WindowChrome>
     <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
 </WindowChrome.WindowChrome>
@@ -458,9 +458,70 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
 </Window>
 "@
 
+[xml]$XAMLWindow_Sources = @"
+        <Window x:Name="Window_Sources"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        Title="Sources" Height="171" Width="650" ResizeMode="CanResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+<WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
+</WindowChrome.WindowChrome>
+<Grid>
+    <Button x:Name="Sources_Button_Save" Content=" Save and restart app " HorizontalAlignment="Right" Margin="0,2,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
+    <Button x:Name="Sources_Button_Cancel" Content=" Cancel " HorizontalAlignment="Right" Margin="0,2,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
+    <Button x:Name="Sources_Button_Insert" Content=" + " HorizontalAlignment="Center" Margin="-8,-3,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" FontWeight="Bold" FontSize="18"/>
+    <Button x:Name="Sources_Button_Remove" Content=" - " HorizontalAlignment="Center" Margin="24,-3,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" FontWeight="Bold" FontSize="18"/>
+    <Button x:Name="Sources_Button_Verify" Content=" Verify access " HorizontalAlignment="Left" Margin="2,2,0,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
+    <DataGrid Margin="0,21,0,0" x:Name="Sources_DataGrid" ColumnWidth="*" AutoGenerateColumns="False" CanUserAddRows="False">
+        <DataGrid.Columns>
+            <DataGridTextColumn Header="Database" Binding="{Binding DBPath}"/>
+            <DataGridTextColumn Header="Database Key" Binding="{Binding DBKeyPath}"/>
+            <DataGridTextColumn Header="Verified" Binding="{Binding DBAccessVerified}" IsReadOnly="True" Width="50">
+                <DataGridTextColumn.ElementStyle>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="HorizontalAlignment" Value="Center" />
+                    </Style>
+                </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+        </DataGrid.Columns>
+    </DataGrid>
+</Grid>
+</Window>
+"@
+
+[xml]$XAMLMaster_Password_Window = @"
+    <Window x:Name="Window_Password"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        Title="Master Password" Height="72" Width="320" WindowStartupLocation="CenterOwner" ResizeMode="NoResize" WindowStyle="ToolWindow" ScrollViewer.VerticalScrollBarVisibility="Disabled" HorizontalContentAlignment="Center" SnapsToDevicePixels="True">
+        <Grid>
+            <PasswordBox x:Name="PasswordBox_Window_Password" HorizontalAlignment="Left" Margin="4,0,0,0" VerticalAlignment="Center" Width="240" Height="21" Padding="2,0,2,0"/>
+            <Button x:Name="BottonFO_Window_Password" Content=" GO " HorizontalAlignment="Right" Margin="0,0,5,0" VerticalAlignment="Center" Background="{x:Null}" BorderBrush="#FFABADB3"/>
+            <Label x:Name="Label_Window_Password" Content="" Height="20" Margin="0,0,38,0" VerticalAlignment="Center" Width="18" HorizontalAlignment="Right" Padding="0,0,0,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+        </Grid>
+    </Window>
+"@
+
 Function WindowMain_FadeAnimation {
     Param ($From,$To,$DurationSec)
     $Window_main.BeginAnimation([System.Windows.Window]::OpacityProperty, $([System.Windows.Media.Animation.DoubleAnimation]::new($From,$To,$(New-TimeSpan -Seconds $DurationSec))))
+}
+
+Function Button_Filter_BlinkAnimation {
+    Param ([bool]$Animation)
+    $DoubleAnimation = [System.Windows.Media.Animation.DoubleAnimation]::new()
+    $DoubleAnimation.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
+    $DoubleAnimation.AutoReverse = $true
+    $DoubleAnimation.From = 0
+    $DoubleAnimation.To = 1
+    $DoubleAnimation.Duration = New-TimeSpan -Seconds 0.6
+    if ($Animation) {
+        $Button_Filter.BeginAnimation([System.Windows.Controls.Button]::OpacityProperty, $DoubleAnimation)
+    } else {
+        $DoubleAnimation.BeginTime = $null
+    }
 }
 
 Function Button_Filter_BlinkAnimation {
@@ -624,7 +685,7 @@ function VerifyMasterKeys {
     $Window_PassType_Entrance.ShowDialog() | Out-Null
 }
 
-If ($AppSettings) { PassType_Entrance }
+If ($Global:DBInstances.Count -gt 0) { PassType_Entrance }
 
 # Common variables, objects
 $Global:Delay = 20
@@ -734,15 +795,13 @@ Function SendKey {
 Function Send_Credentials {
     param(
         [string]$uuid,
+        [string]$DatabasePath_Title,
         [bool]$Ctrl,
         [bool]$Shift
     )
 
-    $Global:DBInstances | % {
-        $DatabasePath = $_.DBPath
-        $TryGetEntry = Get-KeePassEntry -MasterKey $_.DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $DatabasePath}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
-        If ($TryGetEntry) {$Entry = $TryGetEntry}
-    }
+    $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
+    If ($TryGetEntry) {$Entry = $TryGetEntry}
 
     ## Start-sleep -Milliseconds 100
 
@@ -791,23 +850,23 @@ function DrawButtons {
         $DatabasePath = $_.DBPath
         Get-KeePassEntry -MasterKey $_.DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $DatabasePath}).Name) | ? {$_.FullPath -notlike "*/Recycle Bin"} | % {
             $Uuid = $_.Uuid.ToHexString()
-            $AttributedEntry = $Global:AttributedEntries.Where({$_.uuid -eq $Uuid})
-            If (($AttributedEntry).Count -eq 0) {
+            $AttributedEntry = $Global:AttributedEntries[$Global:AttributedEntries.uuid.IndexOf($Uuid)]
+            If (-Not $AttributedEntry) {
                 [EntryBrief]$NewEntry = New-Object -TypeName EntryBrief
                 $NewEntry.uuid = $Uuid
                 $NewEntry.Name = $_.Title
-                $NewEntry.DBPath = $_.DBPath
-                $NewEntry.DBName = $_.DBName
+                $NewEntry.DBPath = $AttributedEntry.DBPath
+                $NewEntry.DBName = $AttributedEntry.DBName
                 $NewEntry.OrderNum = 0
-                $NewEntry.IsVisible = $true
+                $NewEntry.IsVisible = $false
                 $EntriesUnsorted += $NewEntry
             } else {
                 if ($AttributedEntry.IsVisible) {
                     [EntryBrief]$NewEntry = New-Object -TypeName EntryBrief
                     $NewEntry.uuid = $Uuid
                     $NewEntry.Name = $_.Title
-                    $NewEntry.DBPath = $_.DBPath
-                    $NewEntry.DBName = $_.DBName
+                    $NewEntry.DBPath = $AttributedEntry.DBPath
+                    $NewEntry.DBName = $AttributedEntry.DBName
                     $NewEntry.OrderNum = $AttributedEntry.OrderNum
                     $NewEntry.IsVisible = $true
                     $EntriesUnsorted += $NewEntry
@@ -828,6 +887,7 @@ function DrawButtons {
         $Window_main.Height += 20
         $Button = [System.Windows.Controls.Button]::new()
         $Button.Name = "Button_" + $_.uuid
+        $Button.Tag = $_.DBPath + "`t" + $_.Name
         $Button.Content = $_.Name
         $Button.VerticalAlignment = [System.Windows.VerticalAlignment]::Top
         $Button.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Stretch
@@ -839,7 +899,7 @@ function DrawButtons {
         If($i -eq ($EntriesSorted.Count - 1)) {$Button.BorderThickness = 1} else {$Button.BorderThickness = "1,1,1,0"}
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
-            Send_Credentials $($This.Name.Substring(7)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)))
+            Send_Credentials $($This.Name.Substring(7)) $($This.Tag) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
         $i += 1
@@ -937,14 +997,6 @@ $Main_Tool_Icon.Add_Click({
     }
 })
 
-$Menu_Exit.add_Click({
-    SaveConfiguration
-    $Global:DBInstances | % {$_.DBMasterKey = $null}
-    $Window_main.OwnedWindows | % {$_.Close()}
-    $Window_main.Close()
-    [Environment]::Exit(1)
-})
-
 $Button_Filter.Add_Click({
     $Global:FadeAllowed = $false
     $Global:CurrentEntries = ArrangeEntries
@@ -953,6 +1005,23 @@ $Button_Filter.Add_Click({
     $Reader=(New-Object System.Xml.XmlNodeReader $XAMLSelectorWindow)
     try { $Window_Selector = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
     $XAMLSelectorWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Selector.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
+Function Selector_Button_Sources_BlinkAnimation {
+    Param ([bool]$Animation)
+    $DoubleAnimation = [System.Windows.Media.Animation.DoubleAnimation]::new()
+    $DoubleAnimation.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
+    $DoubleAnimation.AutoReverse = $true
+    $DoubleAnimation.From = 0
+    $DoubleAnimation.To = 1
+    $DoubleAnimation.Duration = New-TimeSpan -Seconds 0.6
+    if ($Animation) {
+        $Selector_Button_Sources.BeginAnimation([System.Windows.Controls.Button]::OpacityProperty, $DoubleAnimation)
+    } else {
+        $DoubleAnimation.BeginTime = $null
+    }
+}
+
+    Selector_Button_Sources_BlinkAnimation $($Global:DBInstances.Count -eq 0)
 
     $Window_Selector.add_MouseLeftButtonDown({$Window_Selector.DragMove()})
 
@@ -976,48 +1045,93 @@ $Button_Filter.Add_Click({
     $ListView_Selector.SelectedIndex = 0
 
     $Selector_Button_Sources.Add_Click({
-        [xml]$XAMLWindow_Sources = @"
-        <Window x:Name="Window_Sources"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        Title="Sources" Height="171" Width="650" ResizeMode="CanResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" WindowStartupLocation="CenterScreen" ShowInTaskbar="False">
-<WindowChrome.WindowChrome>
-    <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
-</WindowChrome.WindowChrome>
-<Grid>
-    <Button x:Name="Sources_Button_Save" Content=" Save " HorizontalAlignment="Right" Margin="0,2,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
-    <Button x:Name="Sources_Button_Cancel" Content=" Cancel " HorizontalAlignment="Right" Margin="0,2,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
-    <Button x:Name="Sources_Button_Insert" Content=" + " HorizontalAlignment="Center" Margin="-8,-3,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" FontWeight="Bold" FontSize="18"/>
-    <Button x:Name="Sources_Button_Remove" Content=" - " HorizontalAlignment="Center" Margin="24,-3,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" FontWeight="Bold" FontSize="18"/>
-    <Button x:Name="Sources_Button_Browse" Content=" Browse " HorizontalAlignment="Left" Margin="4,2,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" IsEnabled="false"/>
-    <Button x:Name="Sources_Button_Verify" Content=" Verify Access " HorizontalAlignment="Left" Margin="54,2,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
-    <DataGrid Margin="0,21,0,0" x:Name="Sources_DataGrid" ColumnWidth="*">
-        <DataGrid.Columns>
-            <DataGridTextColumn Header="Database" Binding="{Binding DBPath}"/>
-            <DataGridTextColumn Header="Database Key" Binding="{Binding DBKeyPath}"/>
-            <DataGridTextColumn Header="Verified" Binding="{Binding DBAccessVirified}" IsReadOnly="True" Width="50">
-                <DataGridTextColumn.ElementStyle>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="HorizontalAlignment" Value="Center" />
-                    </Style>
-                </DataGridTextColumn.ElementStyle>
-            </DataGridTextColumn>
-        </DataGrid.Columns>
-    </DataGrid>
-</Grid>
-</Window>
-"@
-
         $Reader=(New-Object System.Xml.XmlNodeReader $XAMLWindow_Sources)
         try { $Window_Sources = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
         $XAMLWindow_Sources.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Sources.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
         $Window_Sources.add_MouseLeftButtonDown({$Window_Sources.DragMove()})
 
+        Class DBRecord {
+            [string]$DBPath
+            [string]$DBKeyPath
+            [string]$DBName
+            [bool]$DBAccessVerified
+        }
+
         $Global:SelectedColumnIndex = 0
 
-        $Sources_Button_Browse.Add_Click({
+        $DBRecords = New-Object System.Collections.ObjectModel.ObservableCollection[DBRecord]
+
+        $Global:DBInstances | % {
+            $DBRecord = [DBRecord]::new()
+            $DBRecord.DBPath = $_.DBPath
+            $DBRecord.DBName = $_.DBName
+            $DBRecord.DBKeyPath = $_.DBKeyPath
+            $DBRecord.DBAccessVerified = $true
+            $DBRecords.Add($DBRecord)
+        }
+        
+        $Sources_DataGrid.ItemsSource = $DBRecords
+
+        $Sources_Button_Insert.Add_Click({
+            $DBRecord = [DBRecord]::new()
+            $DBRecord.DBPath = ""
+            $DBRecord.DBKeyPath = ""
+            $DBRecord.DBName = ""
+            $DBRecord.DBAccessVerified = $false
+            $DBRecords.Add($DBRecord)
+        })
+
+        $Sources_Button_Verify.Add_Click({
+            if ($Sources_DataGrid.SelectedIndex -ne -1) {
+                $Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Password_Window)
+                try { $Window_Password = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+                $XAMLMaster_Password_Window.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Password.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
+                $DBPath = $DBRecords[$Sources_DataGrid.SelectedIndex].DBPath
+                $DBKeyPath = $DBRecords[$Sources_DataGrid.SelectedIndex].DBKeyPath
+
+                $BottonFO_Window_Password.Add_Click({
+                    If ($DBKeyPath) {
+                        New-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -DatabasePath $DBPath -UseMasterKey -KeyPath $DBKeyPath
+                    } else {
+                        New-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -DatabasePath $DBPath -UseMasterKey
+                    }
+                    
+                    Try {
+                        $DBName = (Get-KeePassGroup -DatabaseProfileName 'TestConnection' -MasterKey $PasswordBox_Window_Password.SecurePassword)[0].Name
+                        $DBRecords[$Sources_DataGrid.SelectedIndex].DBAccessVerified = $true
+                        $DBRecords[$Sources_DataGrid.SelectedIndex].DBName = $DBName
+                        $Sources_DataGrid.Items.Refresh()
+                        Remove-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -Confirm:$false
+                        $Window_Password.Close()
+                    } catch {
+                        Remove-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -Confirm:$false
+                        [System.Windows.MessageBox]::Show("Error connecting to selected database",$([System.Windows.MessageBoxButton]::YesNo))
+                    }
+                })
+                
+                $CurrentLanguageManager = [System.Windows.Input.InputLanguageManager]::Current
+                $Label_Window_Password.Content = ($CurrentLanguageManager).CurrentInputLanguage.TwoLetterISOLanguageName.ToUpper()
+                $CurrentLanguageManager.add_InputLanguageChanged({
+                    Param(
+                        [System.Object]$Sender,
+                        [System.Windows.Input.InputLanguageChangedEventArgs]$e
+                    )
+
+                    Try { $Label_NewTerm_Language.Content = $e.NewLanguage.TwoLetterISOLanguageName.ToUpper() } catch {}
+                    $Label_Window_Password.Content = $e.NewLanguage.TwoLetterISOLanguageName.ToUpper()
+                })
+
+                $PasswordBox_Window_Password.Focus() | Out-Null
+                $Window_Password.Owner = $Window_Sources
+                $Window_Password.Activate() | Out-Null
+                $Window_Password.Focus() | Out-Null
+                $Window_Password.ShowDialog() | Out-Null
+            }
+        })
+
+        $Sources_DataGrid.Add_MouseDoubleClick({
             $OpenFileDialog = New-Object Microsoft.Win32.OpenFileDialog
             $OpenFileDialog.Title = "Select File"
             $OpenFileDialog.InitialDirectory = ""
@@ -1029,35 +1143,43 @@ $Button_Filter.Add_Click({
                     0 {$DBRecords[$Sources_DataGrid.SelectedIndex].DBPath = $OpenFileDialog.FileName}
                     1 {$DBRecords[$Sources_DataGrid.SelectedIndex].DBKeyPath = $OpenFileDialog.FileName}
                 }
-                $DBRecords[$Sources_DataGrid.SelectedIndex].DBAccessVirified = $false
-                $Sources_DataGrid.ItemsSource = $null
-                $Sources_DataGrid.ItemsSource = $DBRecords
+                $DBRecords[$Sources_DataGrid.SelectedIndex].DBAccessVerified = $false
+                $Sources_DataGrid.Items.Refresh()
             }
-        })
-
-        $Sources_Button_Insert.Add_Click({
-            
+            $Sources_DataGrid.CancelEdit()
         })
 
         $Sources_Button_Remove.Add_Click({
-            
+            if ($Sources_DataGrid.SelectedIndex -ne -1) {
+                $DBRecords.RemoveAt($Sources_DataGrid.SelectedIndex)
+            }
+        })
+        
+        $Sources_Button_Save.Add_Click({
+            if ($DBRecords | ? {-Not $_.DBAccessVerified}) {
+                [System.Windows.MessageBox]::Show("All Entries must be verified before save")
+            } else {
+                [DBInstance[]]$Global:DBInstances = @()
+                $Global:CurrentEntries = $Global:CurrentEntries | ? {$DBRecords.DBName.IndexOf($_.DBName) -ne -1}
+                $DBRecords | % {
+                    [DBInstance]$NewDBInstance = [DBInstance]::new()
+                    $NewDBInstance.DBName = $_.DBName
+                    $NewDBInstance.DBKeyPath = $_.DBKeyPath
+                    $NewDBInstance.DBPath = $_.DBPath
+                    $Global:DBInstances += $NewDBInstance
+                }
+                SaveConfiguration
+                $Window_main.OwnedWindows | % {$_.Close()}
+                $Window_main.Close()
+                Start powershell $PSCommandPath
+                [Environment]::Exit(1)
+            }
         })
 
         $Sources_Button_Cancel.Add_Click({
             $Window_Sources.Close()
         })
-
-        [PSCustomObject[]]$DBRecords = @()
-        $DBInstances | % {
-            $DBRecords += [PSCustomObject]@{
-              DBPath = $_.DBPath
-              DBKeyPath = $_.DBKeyPath
-              DBAccessVirified = $True
-            }
-        }
-
-        $Sources_DataGrid.ItemsSource = $DBRecords
-
+        
         $Sources_DataGrid.Add_BeginningEdit({
             $Sources_Button_Browse.IsEnabled = $true
             $Global:SelectedColumnIndex = $_.Column.DisplayIndex
@@ -1120,7 +1242,8 @@ $Button_Filter.Add_Click({
     })
 
     $Selector_Button_KeePass.Add_Click({
-        if ($Global:KeePass_Path -eq "Undefined") {
+        if (($Global:KeePass_Path -eq "Undefined") -or [String]::IsNullOrEmpty($Global:KeePass_Path)) {
+            $Global:KeePass_Path = "Undefined"
             $objForm = New-Object System.Windows.Forms.OpenFileDialog
             $objForm.Title = "Select location of keepass.exe"
             $objForm.InitialDirectory = $env:SystemDrive
@@ -1221,6 +1344,14 @@ $Button_Clipboard.add_Click.Invoke({
 })
 
 $Button_Hide.add_Click.Invoke({$Global:FadeAllowed = $False ; WindowMain_FadeAnimation -From 2 -to -1 -DurationSec 0.6})
+
+$Menu_Exit.add_Click({
+    SaveConfiguration
+    $Global:DBInstances | % {$_.DBMasterKey = $null}
+    $Window_main.OwnedWindows | % {$_.Close()}
+    $Window_main.Close()
+    [Environment]::Exit(1)
+})
 
 $Window_main.Add_Loaded({
     $Window_main.Title = $appName + " v." + $appVersion
