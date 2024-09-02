@@ -714,10 +714,10 @@ Function SHIFT_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey)
     [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey)
 }
 
 Function SINGLE_KEY {
@@ -729,6 +729,58 @@ Function SINGLE_KEY {
     [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
 }
 
+Class KeysClass {
+    [string]$KeyEntered
+    [string]$FunctionName
+    [string]$TypeThis
+}
+
+[KeysClass[]]$KeysArray = @()
+$KeysArray += [KeysClass]@{KeyEntered = "!"; TypeThis = "D1"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "@"; TypeThis = "D2"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "#"; TypeThis = "D3"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "$"; TypeThis = "D4"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "%"; TypeThis = "D5"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "^"; TypeThis = "D6"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "&"; TypeThis = "D7"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "*"; TypeThis = "D8"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "("; TypeThis = "D9"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = ")"; TypeThis = "D0"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "_"; TypeThis = "OemMinus"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "+"; TypeThis = "Oemplus"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "<"; TypeThis = "Oemcomma"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = ">"; TypeThis = "OemPeriod"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "?"; TypeThis = "Oem2"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = ":"; TypeThis = "Oem1"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = """"; TypeThis = "Oem7"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "|"; TypeThis = "Oem5"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "{"; TypeThis = "Oem4"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "}"; TypeThis = "Oem6"; FunctionName = "SHIFT_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "``"; TypeThis = "Oem3"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "-"; TypeThis = "OemMinus"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "="; TypeThis = "Oemplus"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = ","; TypeThis = "Oemcomma"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "."; TypeThis = "OemPeriod"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "/"; TypeThis = "Oem2"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = ";"; TypeThis = "Oem1"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "'"; TypeThis = "Oem7"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "\"; TypeThis = "Oem5"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "["; TypeThis = "Oem4"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "]"; TypeThis = "Oem6"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = " "; TypeThis = "Space"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "`n"; TypeThis = "Enter"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "`t"; TypeThis = "Tab"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F1"; TypeThis = "F1"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F2"; TypeThis = "F2"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F3"; TypeThis = "F3"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F4"; TypeThis = "F4"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F5"; TypeThis = "F5"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F6"; TypeThis = "F6"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F7"; TypeThis = "F7"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F8"; TypeThis = "F8"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F9"; TypeThis = "F9"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = "F10"; TypeThis = "F10"; FunctionName = "SINGLE_KEY"}
+
 Function SendKey {
     param (
             [string]$KEY
@@ -739,54 +791,8 @@ Function SendKey {
         '[a-z]$' { [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) }
         '^[0-9]' { [Keyboard]::KeyDown([System.Windows.Forms.Keys]::("D"+$KEY)) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::("D" + $KEY)) }
         DEFAULT {
-            Switch ($KEY) {
-                "~" { SHIFT_KEY "Oem3" }
-                "!" { SHIFT_KEY "D1"}
-                "@" { SHIFT_KEY "D2"}
-                "#" { SHIFT_KEY "D3"}
-                "$" { SHIFT_KEY "D4"}
-                "%" { SHIFT_KEY "D5"}
-                "^" { SHIFT_KEY "D6"}
-                "&" { SHIFT_KEY "D7"}
-                "*" { SHIFT_KEY "D8"}
-                "(" { SHIFT_KEY "D9"}
-                ")" { SHIFT_KEY "D0"}
-                "_" { SHIFT_KEY "OemMinus"}
-                "+" { SHIFT_KEY "Oemplus" }
-                "<" { SHIFT_KEY "Oemcomma"}
-                ">" { SHIFT_KEY "OemPeriod"}
-                "?" { SHIFT_KEY "Oem2"}
-                ":" { SHIFT_KEY "Oem1"}
-                """" { SHIFT_KEY "Oem7"}
-                "|" { SHIFT_KEY "Oem5"}
-                "{" { SHIFT_KEY "Oem4"}
-                "}" { SHIFT_KEY "Oem6"}
-                "``" {SINGLE_KEY "Oem3"}
-                "-" {SINGLE_KEY "OemMinus"}
-                "=" {SINGLE_KEY "Oemplus"}
-                "," {SINGLE_KEY "Oemcomma"}
-                "." {SINGLE_KEY "OemPeriod"}
-                "/" {SINGLE_KEY "Oem2"}
-                ";" {SINGLE_KEY "Oem1"}
-                "'" {SINGLE_KEY "Oem7"}
-                "\" {SINGLE_KEY "Oem5"}
-                "[" {SINGLE_KEY "Oem4"}
-                "]" {SINGLE_KEY "Oem6"}
-                " " {SINGLE_KEY "Space"}
-                "`n" {SINGLE_KEY "Enter"}
-                "`t" {SINGLE_KEY "Tab"}
-                "F1" {SINGLE_KEY "F1"}
-                "F2" {SINGLE_KEY "F2"}
-                "F3" {SINGLE_KEY "F3"}
-                "F4" {SINGLE_KEY "F4"}
-                "F5" {SINGLE_KEY "F5"}
-                "F6" {SINGLE_KEY "F6"}
-                "F7" {SINGLE_KEY "F7"}
-                "F8" {SINGLE_KEY "F8"}
-                "F9" {SINGLE_KEY "F9"}
-                "F10" {SINGLE_KEY "F10"}
-                DEFAULT {}
-            }
+            $Index = $KeysArray.KeyEntered.IndexOf($KEY)
+            If ($Index -ne -1) {&$KeysArray[$Index].FunctionName $KeysArray[$Index].TypeThis}
         }
     }
     Start-Sleep -Milliseconds $Global:Delay
