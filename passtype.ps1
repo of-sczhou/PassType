@@ -714,10 +714,10 @@ Function SHIFT_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey)
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey)
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
 }
 
 Function SINGLE_KEY {
@@ -803,7 +803,8 @@ Function Send_Credentials {
         [string]$uuid,
         [string]$DatabasePath_Title,
         [bool]$Ctrl,
-        [bool]$Shift
+        [bool]$Shift,
+        [bool]$WinKey
     )
 
     $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
@@ -811,22 +812,25 @@ Function Send_Credentials {
 
     ## Start-sleep -Milliseconds 100
 
-    # Type entry name, TAB and password
-    If (-Not $Shift) {
-        if (-Not $Ctrl) { # type entry if not Ctrl pressed
-            $Entry.UserName.ToCharArray() | % { SendKey $_ }
-            Start-sleep -Milliseconds 100
-            [Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
+    if ($WinKey) {  # entry URL open
+        Start $Entry.URL
+    } else {
+        # Type entry name, TAB and password
+        If (-Not $Shift) {
+            if (-Not $Ctrl) { # type entry if not Ctrl pressed
+                $Entry.UserName.ToCharArray() | % { SendKey $_ }
+                Start-sleep -Milliseconds 100
+                [Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
+            }
+            # Waiting for the user to release the Ctrl button after click
+            Start-sleep -Milliseconds 300
+
+            $(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)))).ToCharArray() | % { SendKey $_ }
         }
-        # Waiting for the user to release the Ctrl button after click
-        Start-sleep -Milliseconds 300
 
-        $(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)))).ToCharArray() | % { SendKey $_ }
+        if ($Shift -and (-Not $Ctrl)) { $Entry.UserName.ToCharArray() | % { SendKey $_ } } # Type only entry Name
     }
-
-    if ($Shift -and (-Not $Ctrl)) { $Entry.UserName.ToCharArray() | % { SendKey $_ } } # Type only entry Name
-
-    if ($Shift -and $Ctrl) { Start $Entry.URL } # entry URL open
+    
 
     if ($CheckBox_AutoComplete.IsChecked) {[Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
     Return
@@ -888,7 +892,7 @@ function DrawButtons {
     If ($WindowMain_KPButtons_Grid.Children.Count -ne 0) {$WindowMain_KPButtons_Grid.Children.RemoveRange(0,$($WindowMain_KPButtons_Grid.Children.Count))}
     $Window_Main.Height = $InitialWindowHeight
     $i = 0
-    $ToolTipText = "with Ctrl - send Password$([System.Environment]::NewLine)with Shift - send Username$([System.Environment]::NewLine)with Ctrl+Shift - open URL"
+    $ToolTipText = "with Ctrl - send Password$([System.Environment]::NewLine)with Shift - send Username$([System.Environment]::NewLine)with Win+Shift - open URL"
     $EntriesSorted | % {
         $Window_main.Height += 20
         $Button = [System.Windows.Controls.Button]::new()
@@ -905,7 +909,7 @@ function DrawButtons {
         If($i -eq ($EntriesSorted.Count - 1)) {$Button.BorderThickness = 1} else {$Button.BorderThickness = "1,1,1,0"}
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
-            Send_Credentials $($This.Name.Substring(7)) $($This.Tag) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)))
+            Send_Credentials $($This.Name.Substring(7)) $($This.Tag) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
         $i += 1
