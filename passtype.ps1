@@ -419,7 +419,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
     <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
 </WindowChrome.WindowChrome>
 <Grid>
-    <ListView BorderThickness="0" x:Name="ListView_Selector" SelectionMode="Multiple" Margin="0,22,0,0">
+    <ListView BorderThickness="0" x:Name="ListView_Selector" SelectionMode="Single" Margin="0,22,0,0">
         <ListView.View>
             <GridView x:Name="GridView_Selector">
                 <GridViewColumn Header="Visible" Width="NaN">
