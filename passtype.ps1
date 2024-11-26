@@ -827,11 +827,13 @@ Function Send_Credentials {
         [bool]$WinKey
     )
 
+    $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
+    If ($TryGetEntry) {$Entry = $TryGetEntry}
+
     if ($WinKey) {  # entry URL open
         Start $Entry.URL
     } else { # Type content
-        $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
-        If ($TryGetEntry) {$Entry = $TryGetEntry}        
+                
 
         if (-Not $TypeKeys) {
             $PerviousClipBoard = Get-Clipboard -Raw
