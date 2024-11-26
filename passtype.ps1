@@ -370,7 +370,7 @@ Import-Module -Name $($ExecDir + "\poshkeepass")
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    Title="PassType" Height="67" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" Topmost="{Binding ElementName=CheckBox_AlwaysOnTop, Path=IsChecked}" WindowStartupLocation="CenterScreen" Opacity="0">
+    Title="PassType" Height="67" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" WindowStartupLocation="CenterScreen" Opacity="0" Topmost="True">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
     </WindowChrome.WindowChrome>
@@ -382,9 +382,17 @@ Import-Module -Name $($ExecDir + "\poshkeepass")
                     <ToolTip>Filter, Order, Refresh</ToolTip>
                 </Button.ToolTip>
             </Button>
-            <CheckBox x:Name="CheckBox_AlwaysOnTop" HorizontalAlignment="Left" Margin="34,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="#FF263238">
+            <CheckBox x:Name="CheckBox_TypeOrClip" HorizontalAlignment="Left" Margin="34,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="#FF263238">
                 <CheckBox.ToolTip>
-                    <ToolTip>Always on Top</ToolTip>
+                    <ToolTip>
+                        <TextBlock>  
+                            Type characters like keyboard if checkbox is checked
+                        <LineBreak/>
+                            otherwise paste via clipboard (does not work in environments
+                        <LineBreak/>
+                            where clipboard sharing is not possible or prohibited)
+                        </TextBlock>
+                    </ToolTip>
                 </CheckBox.ToolTip>
             </CheckBox>
             <CheckBox x:Name="CheckBox_AutoRun" HorizontalAlignment="Left" Margin="55,6,0,0" VerticalAlignment="Top" Background="Transparent" BorderBrush="#FF263238">
@@ -693,7 +701,7 @@ $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
 
 Function SaveConfiguration {
-    $Global:CheckBoxes[0] = $CheckBox_AlwaysOnTop.IsChecked
+    $Global:CheckBoxes[0] = $CheckBox_TypeOrClip.IsChecked
     $Global:CheckBoxes[1] = $CheckBox_AutoComplete.IsChecked
     [DBInstance[]]$DBInstancesOut = @()
     $Global:DBInstances | % {
@@ -714,10 +722,21 @@ Function SHIFT_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey)# ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)# ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey)# ; Start-Sleep -Milliseconds $Global:Delay
+}
+
+Function СTRL_KEY {
+    param(
+        [string]$KEY
+    )
+
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ControlKey)# ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)# ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ControlKey)# ; Start-Sleep -Milliseconds $Global:Delay
 }
 
 Function SINGLE_KEY {
@@ -800,6 +819,7 @@ Function SendKey {
 
 Function Send_Credentials {
     param(
+        [bool]$TypeKeys,
         [string]$uuid,
         [string]$DatabasePath_Title,
         [bool]$Ctrl,
@@ -807,30 +827,55 @@ Function Send_Credentials {
         [bool]$WinKey
     )
 
-    $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
-    If ($TryGetEntry) {$Entry = $TryGetEntry}
-
-    ## Start-sleep -Milliseconds 100
-
     if ($WinKey) {  # entry URL open
         Start $Entry.URL
-    } else {
+    } else { # Type content
+        $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
+        If ($TryGetEntry) {$Entry = $TryGetEntry}        
+
+        if (-Not $TypeKeys) {
+            $PerviousClipBoard = Get-Clipboard -Raw
+        }
+
         # Type entry name, TAB and password
         If (-Not $Shift) {
             if (-Not $Ctrl) { # type entry if not Ctrl pressed
-                $Entry.UserName.ToCharArray() | % { SendKey $_ }
-                Start-sleep -Milliseconds 100
+                if ($TypeKeys) {
+                    $Entry.UserName.ToCharArray() | % { SendKey $_ }
+                    Start-sleep -Milliseconds 100
+                } else {
+                    $Entry.UserName | Set-Clipboard
+                    СTRL_KEY "v"
+                    $null | Set-Clipboard
+                }
                 [Keyboard]::KeyPress([System.Windows.Forms.Keys]::Tab)
             }
             # Waiting for the user to release the Ctrl button after click
             Start-sleep -Milliseconds 300
 
-            $(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)))).ToCharArray() | % { SendKey $_ }
+            if ($TypeKeys) {
+                $(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)))).ToCharArray() | % { SendKey $_ }
+            } else {
+                [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Entry.Password)) | Set-Clipboard
+                СTRL_KEY "v"
+                $null | Set-Clipboard
+            }
         }
 
-        if ($Shift -and (-Not $Ctrl)) { $Entry.UserName.ToCharArray() | % { SendKey $_ } } # Type only entry Name
+        if ($Shift -and (-Not $Ctrl)) {  # Type only entry Name
+            if ($TypeKeys) {
+                $Entry.UserName.ToCharArray() | % { SendKey $_ }
+            } else {
+                $Entry.UserName | Set-Clipboard
+                    СTRL_KEY "v"
+                    $null | Set-Clipboard
+            }
+        }
+
+        if (-Not $TypeKeys) {
+            $PerviousClipBoard | Set-Clipboard
+        }
     }
-    
 
     if ($CheckBox_AutoComplete.IsChecked) {[Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
     Return
@@ -909,7 +954,7 @@ function DrawButtons {
         If($i -eq ($EntriesSorted.Count - 1)) {$Button.BorderThickness = 1} else {$Button.BorderThickness = "1,1,1,0"}
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
-            Send_Credentials $($This.Name.Substring(7)) $($This.Tag) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
+            Send_Credentials $($CheckBox_TypeOrClip.IsChecked) $($This.Name.Substring(7)) $($This.Tag) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
         $i += 1
@@ -1365,7 +1410,7 @@ $Menu_Exit.add_Click({
 
 $Window_main.Add_Loaded({
     $Window_main.Title = $appName + " v." + $appVersion
-    $CheckBox_AlwaysOnTop.IsChecked = $Global:CheckBoxes[0]
+    $CheckBox_TypeOrClip.IsChecked = $Global:CheckBoxes[0]
     $CheckBox_AutoComplete.IsChecked = $Global:CheckBoxes[1]
     Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
 
