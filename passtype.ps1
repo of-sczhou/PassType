@@ -1011,7 +1011,6 @@ $Main_Tool_Icon.Add_Click({
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
-        $Window_main.Topmost = $true
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
     }
