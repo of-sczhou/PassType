@@ -688,7 +688,7 @@ function VerifyMasterKeys {
 If ($Global:DBInstances.Count -gt 0) { PassType_Entrance }
 
 # Common variables, objects
-$Global:Delay = 20
+$Global:Delay = 0
 $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
 
@@ -714,9 +714,9 @@ Function SHIFT_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) #; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) #; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) #; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) #; Start-Sleep -Milliseconds $Global:Delay
 }
 
@@ -725,9 +725,9 @@ Function СTRL_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ControlKey) #; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) #; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) #; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ControlKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ControlKey) #; Start-Sleep -Milliseconds $Global:Delay
 }
 
@@ -736,7 +736,7 @@ Function SINGLE_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) #; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
 }
 
@@ -1331,9 +1331,6 @@ $Window_main.Left = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Wi
 
 $CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) })
 $CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
-
-#$CheckBox_AlwaysOnTop.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
-#$CheckBox_AutoComplete.Add_Checked({ SaveConfiguration }) ; $CheckBox_AlwaysOnTop.Add_UnChecked({ SaveConfiguration })
 
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
 
