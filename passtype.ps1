@@ -333,13 +333,14 @@ Add-Type @"
 [bool[]]$Global:CheckBoxes = @($false,$false)
 
 $Global:PreviousWindowHandle = $null # Handle of window wich is active when we click application NotifyIcon in system tray
-$Global:NotifyIconMouseOverOnce = $false
+#$Global:NotifyIconMouseOverOnce = $false
 $Global:NotifyIconMouseC1ickonce = $false
 $Global:WindowMainHandle = $null
+[int]$Global:AllEnriesCount = 0
+$Global:WaitTimer = [System.Diagnostics.Stopwatch]::new()
+[EntryBrief]$Global:New_Button_More = New-Object -TypeName EntryBrief
 
-0..10 | % {
-    New-Variable -Name "PasswordBox$_" -Value $(new-object System.Windows.Controls.PasswordBox) -Scope Global -Force
-}
+0..100 | % { New-Variable -Name "PasswordBox$_" -Value $(new-object System.Windows.Controls.PasswordBox) -Scope Global -Force } # Max attached DB count is 100
 
 # Check KeePass Installation presence
 [string]$Global:KeePass_Path = "Undefined"
@@ -366,15 +367,15 @@ if ($KeePassRecord) {
 Import-Module -Name $($ExecDir + "\poshkeepass")
 
 [xml]$XAMLMainWindow = @"
-<Window x:Name="Window_Main"
+<Window
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    Title="PassType" Height="67" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" Topmost="{Binding ElementName=CheckBox_AlwaysOnTop, Path=IsChecked}" WindowStartupLocation="CenterScreen" Opacity="0">
+    x:Name="Window_Main" Title="PassType" Height="75" Width="130" ResizeMode="CanResize" WindowStyle="None" BorderThickness="0" AllowsTransparency="True" Background="Transparent" Topmost="{Binding ElementName=CheckBox_AlwaysOnTop, Path=IsChecked}" WindowStartupLocation="CenterScreen" Opacity="1">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
     </WindowChrome.WindowChrome>
-    <Border x:Name="WindowMain_Border" CornerRadius="7" BorderBrush="#FF263238" BorderThickness="1" Background="#FF9FC4D6">
+    <Border x:Name="WindowMain_Border" CornerRadius="7" BorderBrush="#FF959A9A" BorderThickness="0.5,0.5,0.5,0.5" Background="#FFDFECEE">
         <Grid x:Name="WindowMain_Grid">
             <Button x:Name="Button_Hide" Background="Transparent" HorizontalAlignment="Right" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0,0,0,2" BorderBrush="#FF263238" Margin="0,4,4,0"/>
             <Button x:Name="Button_Filter" Content="..." Background="Transparent" HorizontalAlignment="Left" Height="20" Width="20" VerticalAlignment="Top" BorderThickness="0" BorderBrush="Black" Margin="7,4,0,0" FontWeight="Bold" FontSize="16" Foreground="#FF263238">
@@ -398,8 +399,12 @@ Import-Module -Name $($ExecDir + "\poshkeepass")
                 </CheckBox.ToolTip>
             </CheckBox>
             <Grid x:Name="WindowMain_KPButtons_Grid" Margin="0,29,0,0"/>
-            <Rectangle Fill="#FFBECDD4" Height="12" Margin="6,0,6,28" VerticalAlignment="Bottom" Opacity="0.3" Width="117"/>
-            <Button x:Name="Button_Clipboard" Content="Clipboard" Margin="6,0,6,5" VerticalAlignment="Bottom" Background="Transparent" BorderBrush="#FF263238" BorderThickness="1" Height="20" HorizontalAlignment="Stretch" Foreground="#FF263238"/>
+            <Button x:Name="Button_Clipboard" Content="Clipboard" Margin="6,0,6,6" VerticalAlignment="Bottom" Background="Transparent" BorderBrush="#FF959A9A" BorderThickness="1" Height="20" HorizontalAlignment="Stretch" Foreground="#FF263238" Visibility="Visible"/>
+            <Button x:Name="Button_More" Content="More" Margin="6,0,6,25" VerticalAlignment="Bottom" Background="#09000000" BorderBrush="#FF959A9A" BorderThickness="1" Height="20" HorizontalAlignment="Stretch" Foreground="#FF263238" Visibility="Visible">
+                <Button.ToolTip>
+                    <ToolTip>Use Right Mouse Click to bind custom record to this button</ToolTip>
+                </Button.ToolTip>
+            </Button>
         </Grid>
     </Border>
 </Window>
@@ -415,46 +420,69 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         x:Name="Window_Selector" Title="Options" Height="250" Width="508" ResizeMode="NoResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
-<WindowChrome.WindowChrome>
-    <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
-</WindowChrome.WindowChrome>
-<Grid>
-    <ListView BorderThickness="0" x:Name="ListView_Selector" SelectionMode="Single" Margin="0,22,0,0">
-        <ListView.View>
-            <GridView x:Name="GridView_Selector">
-                <GridViewColumn Header="Visible" Width="NaN">
-                    <GridViewColumn.CellTemplate>
-                        <DataTemplate>
-                            <Grid HorizontalAlignment="Stretch">
-                                <CheckBox IsChecked="{Binding IsVisible}"/>
-                            </Grid>
-                        </DataTemplate>
-                    </GridViewColumn.CellTemplate>
-                </GridViewColumn>
-                <GridViewColumn Header="Name" Width="NaN" DisplayMemberBinding="{Binding Name}"/>
-                <GridViewColumn Header="Database" Width="NaN"  DisplayMemberBinding ="{Binding DBName}"/>
-            </GridView>
-        </ListView.View>
-    </ListView>
-    <Button x:Name="Selector_Button_Sources" Content=" Sources " HorizontalAlignment="Right" Margin="0,2,155,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" />
-    <Button x:Name="Selector_Button_KeePass" Content=" KeePass " HorizontalAlignment="Right" Margin="0,2,98,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" />
-    <Button x:Name="Selector_Button_Apply" Content=" Apply " HorizontalAlignment="Right" Margin="0,2,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
-    <Button x:Name="Selector_Button_Cancel" Content=" Cancel " HorizontalAlignment="Right" Margin="0,2,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
-    <Button x:Name="Selector_Button_Up" Content="▲" Background="White" HorizontalAlignment="Left" Height="18" VerticalAlignment="Top" BorderThickness="0" Width="18" Margin="6,1,0,0" Padding="1,-4,1,1"/>
-    <Button x:Name="Selector_Button_Down" Content="▼" Background="White" HorizontalAlignment="Left" Height="18" VerticalAlignment="Top" BorderThickness="0" Width="18" Margin="25,0,0,0" Padding="1,4,1,1"/>
-    <Label Content="order" HorizontalAlignment="Left" Margin="44,-3,0,0" VerticalAlignment="Top"/>
-    <Label Content="search" HorizontalAlignment="Center" Margin="-250,-3,0,0" VerticalAlignment="Top"/>
-    <TextBox x:Name="Selector_Textbox_Search" Text="" HorizontalAlignment="Center" Margin="-60,2,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="144" TabIndex="0"/>
-    <Button x:Name="Selector_Button_ClearSearchString" HorizontalAlignment="Center" Margin="0,4,-70,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Height="16" Width="16" Visibility="Hidden">
-        <TextBlock  Text="X" Margin="-1,-3,0,0" RenderTransformOrigin="0.5,0.5" Width="8">
-            <TextBlock.RenderTransform>
-                <TransformGroup>
-                    <ScaleTransform ScaleY="1" ScaleX="1.65"/>
-                </TransformGroup>
-            </TextBlock.RenderTransform>
-        </TextBlock>
-    </Button>
-</Grid>
+        <WindowChrome.WindowChrome>
+            <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
+        </WindowChrome.WindowChrome>
+        <Grid>
+            <ListView BorderThickness="0" x:Name="ListView_Selector" SelectionMode="Single" Margin="0,22,0,0">
+                <ListView.View>
+                    <GridView x:Name="GridView_Selector">
+                        <GridViewColumn Header="Visible" Width="NaN">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <CheckBox IsChecked="{Binding IsVisible}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Name" Width="NaN" DisplayMemberBinding="{Binding Name}"/>
+                        <GridViewColumn Header="Database" Width="NaN"  DisplayMemberBinding ="{Binding DBName}"/>
+                        <GridViewColumn Header="Uuid" Width="NaN"  DisplayMemberBinding ="{Binding Uuid}"/>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+            <Button x:Name="Selector_Button_Sources" Content=" Sources " HorizontalAlignment="Right" Margin="0,2,155,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" />
+            <Button x:Name="Selector_Button_KeePass" Content=" KeePass " HorizontalAlignment="Right" Margin="0,2,98,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3" />
+            <Button x:Name="Selector_Button_Apply" Content=" Apply " HorizontalAlignment="Right" Margin="0,2,53,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
+            <Button x:Name="Selector_Button_Cancel" Content=" Cancel " HorizontalAlignment="Right" Margin="0,2,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Padding="1,0,1,3"/>
+            <Button x:Name="Selector_Button_Up" Content="▲" Background="White" HorizontalAlignment="Left" Height="18" VerticalAlignment="Top" BorderThickness="0" Width="18" Margin="6,1,0,0" Padding="1,-4,1,1"/>
+            <Button x:Name="Selector_Button_Down" Content="▼" Background="White" HorizontalAlignment="Left" Height="18" VerticalAlignment="Top" BorderThickness="0" Width="18" Margin="25,0,0,0" Padding="1,4,1,1"/>
+            <Label Content="order" HorizontalAlignment="Left" Margin="44,-3,0,0" VerticalAlignment="Top"/>
+            <TextBox x:Name="Selector_Textbox_Search" HorizontalAlignment="Center" Margin="-60,2,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="144" TabIndex="0">
+                <TextBox.Style>
+                    <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                        <Style.Resources>
+                            <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                <VisualBrush.Visual>
+                                    <Label Content="Search" Foreground="LightGray" />
+                                </VisualBrush.Visual>
+                            </VisualBrush>
+                        </Style.Resources>
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                            </Trigger>
+                            <Trigger Property="Text" Value="{x:Null}">
+                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="Background" Value="White" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBox.Style>
+            </TextBox>
+            <Button x:Name="Selector_Button_ClearSearchString" HorizontalAlignment="Center" Margin="0,4,-70,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Height="16" Width="16" Visibility="Hidden">
+                <TextBlock  Text="X" Margin="-1,-3,0,0" RenderTransformOrigin="0.5,0.5" Width="8">
+                    <TextBlock.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform ScaleY="1" ScaleX="1.65"/>
+                        </TransformGroup>
+                    </TextBlock.RenderTransform>
+                </TextBlock>
+            </Button>
+        </Grid>
 </Window>
 "@
 
@@ -504,24 +532,73 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
     </Window>
 "@
 
+[xml]$XAMLMaster_Window_SearchResults = @"
+    <Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        x:Name="Window_SearchResults" Title="Search Results" Width="260" ResizeMode="NoResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" ShowInTaskbar="False" Visibility="Collapsed" Topmost="True" Height="100">
+        <WindowChrome.WindowChrome>
+            <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
+        </WindowChrome.WindowChrome>
+        <Grid>
+            <ListView BorderThickness="0" x:Name="ListView_SearchResults" SelectionMode="Single" Margin="0,22,0,0">
+                <ListView.Resources>
+                    <Style TargetType="GridViewColumnHeader">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </Style>
+                </ListView.Resources>
+                <ListView.View>
+                    <GridView x:Name="GridView_SearchResults">
+                        <GridViewColumn Header="Name" Width="NaN" DisplayMemberBinding="{Binding Name}"/>
+                        <GridViewColumn Header="Database" Width="NaN"  DisplayMemberBinding ="{Binding DBName}"/>
+                        <GridViewColumn Header="Uuid" Width="NaN"  DisplayMemberBinding ="{Binding Uuid}"/>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+            <TextBox x:Name="SearchResults_Textbox_Search" Text="" Margin="3,2,3,0" TextWrapping="Wrap" VerticalAlignment="Top" TabIndex="0">
+                <TextBox.Style>
+                    <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                        <Style.Resources>
+                            <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                <VisualBrush.Visual>
+                                    <Label Content="Search" Foreground="LightGray" />
+                                </VisualBrush.Visual>
+                            </VisualBrush>
+                        </Style.Resources>
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                            </Trigger>
+                            <Trigger Property="Text" Value="{x:Null}">
+                                <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="Background" Value="White" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBox.Style>
+            </TextBox>
+            <Button x:Name="SearchResults_Button_ClearSearchString" HorizontalAlignment="Right" Margin="0,4,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Height="16" Width="16" Visibility="Hidden">
+                <TextBlock  Text="X" Margin="-1,-3,0,0" RenderTransformOrigin="0.5,0.5" Width="8">
+                    <TextBlock.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform ScaleY="1" ScaleX="1.65"/>
+                        </TransformGroup>
+                    </TextBlock.RenderTransform>
+                </TextBlock>
+            </Button>
+        </Grid>
+    </Window>
+"@
+$Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Window_SearchResults)
+try { $Window_SearchResults = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+$XAMLMaster_Window_SearchResults.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_SearchResults.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
 Function WindowMain_FadeAnimation {
     Param ($From,$To,$DurationSec)
     $Window_main.BeginAnimation([System.Windows.Window]::OpacityProperty, $([System.Windows.Media.Animation.DoubleAnimation]::new($From,$To,$(New-TimeSpan -Seconds $DurationSec))))
-}
-
-Function Button_Filter_BlinkAnimation {
-    Param ([bool]$Animation)
-    $DoubleAnimation = [System.Windows.Media.Animation.DoubleAnimation]::new()
-    $DoubleAnimation.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
-    $DoubleAnimation.AutoReverse = $true
-    $DoubleAnimation.From = 0
-    $DoubleAnimation.To = 1
-    $DoubleAnimation.Duration = New-TimeSpan -Seconds 0.6
-    if ($Animation) {
-        $Button_Filter.BeginAnimation([System.Windows.Controls.Button]::OpacityProperty, $DoubleAnimation)
-    } else {
-        $DoubleAnimation.BeginTime = $null
-    }
 }
 
 Function Button_Filter_BlinkAnimation {
@@ -717,7 +794,7 @@ Function SHIFT_KEY {
     [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
     [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) #; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
 }
 
 Function СTRL_KEY {
@@ -737,7 +814,7 @@ Function SINGLE_KEY {
     )
 
     [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
 }
 
 Class KeysClass {
@@ -800,8 +877,14 @@ Function SendKey {
     
     Switch -regex -CaseSensitive ($KEY) {
         '[A-Z]$' { SHIFT_KEY $KEY }
-        '[a-z]$' { [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) }
-        '^[0-9]' { [Keyboard]::KeyDown([System.Windows.Forms.Keys]::("D"+$KEY)) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::("D" + $KEY)) }
+        '[a-z]$' {
+            SINGLE_KEY $KEY
+            #[Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
+        }
+        '^[0-9]' {
+            SINGLE_KEY ("D"+$KEY)
+            #[Keyboard]::KeyDown([System.Windows.Forms.Keys]::("D"+$KEY)) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::("D" + $KEY))
+        }
         DEFAULT {
             $Index = $KeysArray.KeyEntered.IndexOf($KEY)
             If ($Index -ne -1) {&$KeysArray[$Index].FunctionName $KeysArray[$Index].TypeThis}
@@ -829,8 +912,8 @@ Function Send_Credentials {
         If (-Not $Shift) {
             if (-Not $Ctrl) { # type entry if not Ctrl pressed
                 $Entry.UserName.ToCharArray() | % { SendKey $_ }
-                [Keyboard]::KeyUp([System.Windows.Forms.Keys]::Tab)
-                [Keyboard]::KeyDown([System.Windows.Forms.Keys]::Tab)
+                [Keyboard]::KeyUp([System.Windows.Forms.Keys]::Tab) ; Start-Sleep -Milliseconds $Global:Delay
+                [Keyboard]::KeyDown([System.Windows.Forms.Keys]::Tab) ; Start-Sleep -Milliseconds $Global:Delay
             }
             # Waiting for the user to release the Ctrl button after click
             While (([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) {Start-Sleep -Milliseconds 10}
@@ -864,6 +947,7 @@ $Global:DBInstances | % {
 }
 
 function DrawButtons {
+    $Global:AllEnriesCount = 0
     [EntryBrief[]]$EntriesUnsorted = @()
     $Global:DBInstances | % {
         $DatabasePath = $_.DBPath
@@ -891,6 +975,7 @@ function DrawButtons {
                     $EntriesUnsorted += $NewEntry
                 }
             }
+            $Global:AllEnriesCount++
         }    
     }
 
@@ -903,7 +988,7 @@ function DrawButtons {
     $i = 0
     $ToolTipText = "with Ctrl - send Password$([System.Environment]::NewLine)with Shift - send Username$([System.Environment]::NewLine)with Win+Shift - open URL"
     $EntriesSorted | % {
-        $Window_main.Height += 20
+        $Window_main.Height += 19
         $Button = [System.Windows.Controls.Button]::new()
         $Button.Name = "Button_" + $_.uuid
         $Button.Tag = $_.DBPath + "`t" + $_.Name
@@ -914,7 +999,7 @@ function DrawButtons {
         $Button.Margin = "6,$( [string]($i * ($Button.Height - 1)) ),6,5"
         $Button.Foreground = "#FF263238"
         $Button.Background = "Transparent"
-        $Button.BorderBrush = "#FF263238"
+        $Button.BorderBrush = "#FF959A9A"
         If($i -eq ($EntriesSorted.Count - 1)) {$Button.BorderThickness = 1} else {$Button.BorderThickness = "1,1,1,0"}
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
@@ -923,6 +1008,7 @@ function DrawButtons {
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
         $i += 1
     }
+    If ($Global:AllEnriesCount -ne 0) { $Button_More.Visibility = "Visible" } else { $Button_More.Visibility = "Hidden" }
 }
 
 Button_Filter_BlinkAnimation $($Global:DBInstances.Count -eq 0)
@@ -989,14 +1075,17 @@ $contextmenu = New-Object System.Windows.Forms.ContextMenu
 $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
+<#
 $Main_Tool_Icon.Add_MouseMove({
     if (-Not $Global:NotifyIconMouseOverOnce) {
         $Global:NotifyIconMouseOverOnce = $true
         $Global:PreviousWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
     }
 })
+#>
 
 $Main_Tool_Icon.Add_Click({
+    <#
     if (-Not $Global:NotifyIconMouseC1ickonce) {
         $Global:NotifyIconMouseC1ickonce = $true
 
@@ -1008,6 +1097,7 @@ $Main_Tool_Icon.Add_Click({
             [SystemWindowsFunctions]::SetWindowLong($Global:PreviousWindowHandle,-20,0x00000000)
         }
     }
+    #>
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
@@ -1015,6 +1105,7 @@ $Main_Tool_Icon.Add_Click({
         $Global:FadeAllowed = $true
     }
 })
+#>
 
 $Button_Filter.Add_Click({
     $Global:FadeAllowed = $false
@@ -1326,6 +1417,68 @@ Function Selector_Button_Sources_BlinkAnimation {
     $Window_Selector.ShowDialog()
 })
 
+$Button_More.Add_MouseRightButtonUp({
+    $Window_SearchResults.Show()
+    $Window_SearchResults.Top = $Window_Main.Top + $Window_Main.Height - 47
+    $Window_SearchResults.Left = $Window_Main.Left + $Window_Main.Width/2 - $Window_SearchResults.Width/2
+    $Window_SearchResults.Visibility = "Visible"
+})
+
+$Window_SearchResults.Add_MouseLeave({
+    $Window_SearchResults.Visibility = "Collapsed"
+})
+
+$SearchResults_Textbox_Search.Add_TextChanged({
+    if ($this.Text.Length -ge 2) {
+        [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
+        $ListView_SearchResults.ItemsSource = @($EntriesMatched)
+    } else {
+        If ($this.Text.Length -eq 0) { $SearchResults_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Visible }
+        $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
+    }
+})
+
+$SearchResults_Button_ClearSearchString.Add_Click({
+    $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
+    $SearchResults_Textbox_Search.Text = ""
+    $SearchResults_Textbox_Search.Focus() | Out-Null
+})
+
+Function Remove-RoutedEventHandlers {
+    [CmdletBinding()]
+    Param (
+        [Parameter(Mandatory = $True)]
+        [ValidateNotNullorEmpty()]
+        [System.Windows.UIElement]$Element,
+        [Parameter(Mandatory = $True)]
+        [ValidateNotNullorEmpty()]
+        [System.Windows.RoutedEvent]$RoutedEvent
+    )
+    
+    $eventHandlersStoreProperty = $Element.GetType().GetProperty("EventHandlersStore", [System.Reflection.BindingFlags]'Instance, NonPublic')
+    $eventHandlersStore = $eventHandlersStoreProperty.GetValue($Element, $Null)
+    If ($eventHandlersStore) {
+        $getRoutedEventHandlers = $eventHandlersStore.GetType().GetMethod("GetRoutedEventHandlers", [System.Reflection.BindingFlags]'Instance, Public, NonPublic')
+        $RoutedEventHandlers = [System.Windows.RoutedEventHandlerInfo[]]$getRoutedEventHandlers.Invoke($eventHandlersStore, $RoutedEvent)
+        ForEach ($RoutedEventHandler in $RoutedEventHandlers) {
+            $Element.RemoveHandler($RoutedEvent, $RoutedEventHandler.Handler)
+        }
+    }
+}
+
+$ListView_SearchResults.Add_MouseLeftButtonUp({
+    $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($This.ItemsSource[$This.SelectedIndex].Uuid)]
+    $Button_More.Content = $Global:New_Button_More.Name
+
+    Remove-RoutedEventHandlers -Element $Button_More -RoutedEvent $([System.Windows.Controls.Button]::ClickEvent)
+
+    $Button_More.add_Click.Invoke({
+        Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
+    })
+
+    $Window_SearchResults.Visibility = "Collapsed"
+})
+
 $Window_main.Top = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height) - $Window_main.Height
 $Window_main.Left = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Width) - $Window_main.Width
 
@@ -1335,6 +1488,8 @@ $CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Mic
 $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
 
 $Window_main.Add_MouseEnter({ If ($Window_main.Opacity -ne 1) { WindowMain_FadeAnimation -From $Window_main.Opacity -to 2 -DurationSec 0.6 } })
+
+$Window_main.Add_MouseWheel({ WindowMain_FadeAnimation -From $Window_main.Opacity -to 0 -DurationSec 0.4 })
 
 $Window_main.Add_MouseLeave({
     If ($Global:FadeAllowed) {
