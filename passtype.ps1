@@ -1444,38 +1444,13 @@ $SearchResults_Button_ClearSearchString.Add_Click({
     $SearchResults_Textbox_Search.Focus() | Out-Null
 })
 
-Function Remove-RoutedEventHandlers {
-    [CmdletBinding()]
-    Param (
-        [Parameter(Mandatory = $True)]
-        [ValidateNotNullorEmpty()]
-        [System.Windows.UIElement]$Element,
-        [Parameter(Mandatory = $True)]
-        [ValidateNotNullorEmpty()]
-        [System.Windows.RoutedEvent]$RoutedEvent
-    )
-    
-    $eventHandlersStoreProperty = $Element.GetType().GetProperty("EventHandlersStore", [System.Reflection.BindingFlags]'Instance, NonPublic')
-    $eventHandlersStore = $eventHandlersStoreProperty.GetValue($Element, $Null)
-    If ($eventHandlersStore) {
-        $getRoutedEventHandlers = $eventHandlersStore.GetType().GetMethod("GetRoutedEventHandlers", [System.Reflection.BindingFlags]'Instance, Public, NonPublic')
-        $RoutedEventHandlers = [System.Windows.RoutedEventHandlerInfo[]]$getRoutedEventHandlers.Invoke($eventHandlersStore, $RoutedEvent)
-        ForEach ($RoutedEventHandler in $RoutedEventHandlers) {
-            $Element.RemoveHandler($RoutedEvent, $RoutedEventHandler.Handler)
-        }
-    }
-}
+$Button_More.add_Click.Invoke({
+    Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
+})
 
 $ListView_SearchResults.Add_MouseLeftButtonUp({
     $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($This.ItemsSource[$This.SelectedIndex].Uuid)]
     $Button_More.Content = $Global:New_Button_More.Name
-
-    Remove-RoutedEventHandlers -Element $Button_More -RoutedEvent $([System.Windows.Controls.Button]::ClickEvent)
-
-    $Button_More.add_Click.Invoke({
-        Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
-    })
-
     $Window_SearchResults.Visibility = "Collapsed"
 })
 
