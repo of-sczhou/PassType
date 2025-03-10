@@ -537,7 +537,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        x:Name="Window_SearchResults" Title="Search Results" Width="260" ResizeMode="NoResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" ShowInTaskbar="False" Visibility="Collapsed" Topmost="True" Height="100">
+        x:Name="Window_SearchResults" Title="Search Results" Width="260" ResizeMode="NoResize" WindowStyle="None" SnapsToDevicePixels="True" BorderThickness="1" AllowsTransparency="True" Background="White" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" ShowInTaskbar="False" Visibility="Collapsed"  Topmost="True" Height="100">
         <WindowChrome.WindowChrome>
             <WindowChrome CaptionHeight="0" ResizeBorderThickness="5"/>
         </WindowChrome.WindowChrome>
@@ -556,7 +556,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                     </GridView>
                 </ListView.View>
             </ListView>
-            <TextBox x:Name="SearchResults_Textbox_Search" Text="" Margin="3,2,3,0" TextWrapping="Wrap" VerticalAlignment="Top" TabIndex="0">
+            <TextBox x:Name="SearchResults_Textbox_Search" Text="" Margin="3,2,19,0" TextWrapping="Wrap" VerticalAlignment="Top" TabIndex="0">
                 <TextBox.Style>
                     <Style TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
                         <Style.Resources>
@@ -580,7 +580,7 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                     </Style>
                 </TextBox.Style>
             </TextBox>
-            <Button x:Name="SearchResults_Button_ClearSearchString" HorizontalAlignment="Right" Margin="0,4,4,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Height="16" Width="16" Visibility="Hidden">
+            <Button x:Name="SearchResults_Button_Close" HorizontalAlignment="Right" Margin="0,4,1,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Height="16" Width="16">
                 <TextBlock  Text="X" Margin="-1,-3,0,0" RenderTransformOrigin="0.5,0.5" Width="8">
                     <TextBlock.RenderTransform>
                         <TransformGroup>
@@ -765,7 +765,7 @@ function VerifyMasterKeys {
 If ($Global:DBInstances.Count -gt 0) { PassType_Entrance }
 
 # Common variables, objects
-$Global:Delay = 0
+$Global:Delay = 5
 $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
 
@@ -1424,24 +1424,30 @@ $Button_More.Add_MouseRightButtonUp({
     $Window_SearchResults.Visibility = "Visible"
 })
 
+<#
 $Window_SearchResults.Add_MouseLeave({
     $Window_SearchResults.Visibility = "Collapsed"
 })
+#>
+#$Window_SearchResults.Add_Deactivated({ $Window_SearchResults.Hide() })
 
 $SearchResults_Textbox_Search.Add_TextChanged({
     if ($this.Text.Length -ge 2) {
         [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
         $ListView_SearchResults.ItemsSource = @($EntriesMatched)
     } else {
-        If ($this.Text.Length -eq 0) { $SearchResults_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Visible }
+        #If ($this.Text.Length -eq 0) { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Visible }
         $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
     }
 })
 
-$SearchResults_Button_ClearSearchString.Add_Click({
+$SearchResults_Button_Close.Add_Click({
+    $Window_SearchResults.Visibility = "Collapsed"
+    <#
     $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
     $SearchResults_Textbox_Search.Text = ""
     $SearchResults_Textbox_Search.Focus() | Out-Null
+    #>
 })
 
 $Button_More.add_Click.Invoke({
