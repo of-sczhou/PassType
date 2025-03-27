@@ -869,6 +869,7 @@ $KeysArray += [KeysClass]@{KeyEntered = "F7"; TypeThis = "F7"; FunctionName = "S
 $KeysArray += [KeysClass]@{KeyEntered = "F8"; TypeThis = "F8"; FunctionName = "SINGLE_KEY"}
 $KeysArray += [KeysClass]@{KeyEntered = "F9"; TypeThis = "F9"; FunctionName = "SINGLE_KEY"}
 $KeysArray += [KeysClass]@{KeyEntered = "F10"; TypeThis = "F10"; FunctionName = "SINGLE_KEY"}
+$KeysArray += [KeysClass]@{KeyEntered = ""; TypeThis = ""; FunctionName = ""}
 
 Function SendKey {
     param (
@@ -877,17 +878,11 @@ Function SendKey {
     
     Switch -regex -CaseSensitive ($KEY) {
         '[A-Z]$' { SHIFT_KEY $KEY }
-        '[a-z]$' {
-            SINGLE_KEY $KEY
-            #[Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
-        }
-        '^[0-9]' {
-            SINGLE_KEY ("D"+$KEY)
-            #[Keyboard]::KeyDown([System.Windows.Forms.Keys]::("D"+$KEY)) ; [Keyboard]::KeyUp([System.Windows.Forms.Keys]::("D" + $KEY))
-        }
+        '[a-z]$' { SINGLE_KEY $KEY }
+        '^[0-9]' { SINGLE_KEY ("D$KEY") }
         DEFAULT {
             $Index = $KeysArray.KeyEntered.IndexOf($KEY)
-            If ($Index -ne -1) {&$KeysArray[$Index].FunctionName $KeysArray[$Index].TypeThis}
+            &$KeysArray[$Index].FunctionName $KeysArray[$Index].TypeThis
         }
     }
     #Start-Sleep -Milliseconds $Global:Delay
@@ -896,13 +891,15 @@ Function SendKey {
 Function Send_Credentials {
     param(
         [string]$uuid,
+        [string]$EntryTitle,
         [string]$DatabasePath_Title,
         [bool]$Ctrl,
         [bool]$Shift,
         [bool]$WinKey
     )
 
-    $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
+    #$TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name)  | ? {$($_.Uuid.ToHexString()) -eq $uuid}
+    $TryGetEntry = Get-KeePassEntry -MasterKey $($Global:DBInstances | ? {$_.DBPath -eq $($DatabasePath_Title.Split("`t")[0])}).DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $($DatabasePath_Title.Split("`t")[0])}).Name) -Title $EntryTitle
     If ($TryGetEntry) {$Entry = $TryGetEntry}
 
     if ($WinKey) {  # entry URL open
@@ -1003,7 +1000,7 @@ function DrawButtons {
         If($i -eq ($EntriesSorted.Count - 1)) {$Button.BorderThickness = 1} else {$Button.BorderThickness = "1,1,1,0"}
         $Button.ToolTip = $ToolTipText
         $Button.Add_Click({
-            Send_Credentials $($This.Name.Substring(7)) $($This.Tag) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
+            Send_Credentials $($This.Name.Substring(7)) $($This.Content) $($This.Tag) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
         })
         $WindowMain_KPButtons_Grid.Children.Add($Button) | Out-Null
         $i += 1
