@@ -1448,7 +1448,7 @@ $SearchResults_Button_Close.Add_Click({
 })
 
 $Button_More.add_Click.Invoke({
-    Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
+    Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.Name) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
 })
 
 $ListView_SearchResults.Add_MouseLeftButtonUp({
