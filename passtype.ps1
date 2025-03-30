@@ -789,10 +789,9 @@ Function SHIFT_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [keyboard]::ShortcutKeys(@([System.Windows.Forms.Keys]::RShiftKey.value__,[System.Windows.Forms.Keys]::$KEY.value__))
+    Start-Sleep -Milliseconds $Global:Delay
+
 }
 
 Function СTRL_KEY {
@@ -800,10 +799,8 @@ Function СTRL_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ControlKey) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ControlKey) #; Start-Sleep -Milliseconds $Global:Delay
+    [keyboard]::ShortcutKeys(@([System.Windows.Forms.Keys]::RControlKey.value__,[System.Windows.Forms.Keys]::$KEY.value__))
+    Start-Sleep -Milliseconds $Global:Delay
 }
 
 Function SINGLE_KEY {
@@ -811,8 +808,9 @@ Function SINGLE_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY)
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
+    Start-Sleep -Milliseconds $Global:Delay
 }
 
 Class KeysClass {
@@ -962,7 +960,7 @@ function DrawButtons {
                 $NewEntry.IsVisible = $false
             } else {
                 $NewEntry.OrderNum = ($Global:AttributedEntries[$index]).OrderNum
-                $NewEntry.IsVisible = $true
+                $NewEntry.IsVisible = ($Global:AttributedEntries[$index]).IsVisible
             }
 
             $EntriesUnsorted += $NewEntry
@@ -1260,14 +1258,9 @@ Function Selector_Button_Sources_BlinkAnimation {
             }
         })
 
-        $Sources_Button_Cancel.Add_Click({
-            $Window_Sources.Close()
-        })
+        $Sources_Button_Cancel.Add_Click({ $Window_Sources.Close() })
         
-        $Sources_DataGrid.Add_BeginningEdit({
-            $Sources_Button_Browse.IsEnabled = $true
-            $Global:SelectedColumnIndex = $_.Column.DisplayIndex
-        })
+        $Sources_DataGrid.Add_BeginningEdit({ $Global:SelectedColumnIndex = $_.Column.DisplayIndex })
 
         $Window_Sources.Owner = $Window_Selector
         $Window_Sources.Activate() | Out-Null
