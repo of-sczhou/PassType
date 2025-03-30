@@ -16,6 +16,7 @@ Class DBInstance {
     [string]$DBPath
     [string]$DBKeyPath
     [SecureString]$DBMasterKey
+    [string]$DBFileHash
 }
 
 Class EntryBrief {
@@ -335,7 +336,6 @@ Add-Type @"
 $Global:PreviousWindowHandle = $null # Handle of window wich is active when we click application NotifyIcon in system tray
 #$Global:NotifyIconMouseOverOnce = $false
 $Global:NotifyIconMouseC1ickonce = $false
-$Global:WindowMainHandle = $null
 [int]$Global:AllEnriesCount = 0
 $Global:WaitTimer = [System.Diagnostics.Stopwatch]::new()
 [EntryBrief]$Global:New_Button_More = New-Object -TypeName EntryBrief
@@ -778,12 +778,10 @@ Function SaveConfiguration {
         $TempItem.DBName = $_.DBName
         $TempItem.DBPath = $_.DBPath
         $TempItem.DBKeyPath = $_.DBKeyPath
-        
         $DBInstancesOut += $TempItem
     }
-    $DBInstancesOut | % {$_.DBMasterKey = $null}
     If (-Not $Global:CurrentEntries) { [EntryBrief[]]$Global:CurrentEntries = @() }
-    $Global:KeePass_Path,$Global:CheckBoxes,$DBInstancesOut,$Global:CurrentEntries | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
+    $Global:KeePass_Path,$Global:CheckBoxes,$DBInstancesOut,$($Global:CurrentEntries | ? {$_.IsVisible}) | ConvertTo-Json | Out-File $($ExecDir + "\" + $appName + ".ini")    
 }
 
 Function SHIFT_KEY {
@@ -927,6 +925,7 @@ Function Send_Credentials {
 
 Get-KeePassDatabaseConfiguration | Remove-KeePassDatabaseConfiguration -Confirm:$false
 $Global:DBInstances | % {
+    $_.DBFileHash = (Get-FileHash $_.DBPath).Hash
     $RandomIndex = (Get-Random).ToString()
     if ($_.DBKeyPath) {
         if (Get-KeePassDatabaseConfiguration) {
@@ -948,37 +947,32 @@ function DrawButtons {
     [EntryBrief[]]$EntriesUnsorted = @()
     $Global:DBInstances | % {
         $DatabasePath = $_.DBPath
+        $DatabaseName = $_.DBName
         Get-KeePassEntry -MasterKey $_.DBMasterKey -DatabaseProfileName $((Get-KeePassDatabaseConfiguration | ? {$_.DatabasePath -eq $DatabasePath}).Name) | ? {$_.FullPath -notlike "*/Recycle Bin"} | % {
             $Uuid = $_.Uuid.ToHexString()
-            $AttributedEntry = $Global:AttributedEntries[$Global:AttributedEntries.uuid.IndexOf($Uuid)]
-            If (-Not $AttributedEntry) {
-                [EntryBrief]$NewEntry = New-Object -TypeName EntryBrief
-                $NewEntry.uuid = $Uuid
-                $NewEntry.Name = $_.Title
-                $NewEntry.DBPath = $AttributedEntry.DBPath
-                $NewEntry.DBName = $AttributedEntry.DBName
+            $Index = $Global:AttributedEntries.uuid.IndexOf($Uuid)
+            [EntryBrief]$NewEntry = New-Object -TypeName EntryBrief
+            $NewEntry.uuid = $Uuid
+            $NewEntry.Name = $_.Title
+            $NewEntry.DBPath = $DatabasePath
+            $NewEntry.DBName = $DatabaseName
+            
+            If ($Index -eq -1) {
                 $NewEntry.OrderNum = 0
                 $NewEntry.IsVisible = $false
-                $EntriesUnsorted += $NewEntry
             } else {
-                if ($AttributedEntry.IsVisible) {
-                    [EntryBrief]$NewEntry = New-Object -TypeName EntryBrief
-                    $NewEntry.uuid = $Uuid
-                    $NewEntry.Name = $_.Title
-                    $NewEntry.DBPath = $AttributedEntry.DBPath
-                    $NewEntry.DBName = $AttributedEntry.DBName
-                    $NewEntry.OrderNum = $AttributedEntry.OrderNum
-                    $NewEntry.IsVisible = $true
-                    $EntriesUnsorted += $NewEntry
-                }
+                $NewEntry.OrderNum = ($Global:AttributedEntries[$index]).OrderNum
+                $NewEntry.IsVisible = $true
             }
+
+            $EntriesUnsorted += $NewEntry
             $Global:AllEnriesCount++
         }    
     }
 
     [EntryBrief[]]$EntriesSorted = @()
-    $EntriesSorted += $EntriesUnsorted.Where({$_.OrderNum -ne 0}) | Sort-Object OrderNum
-    $EntriesSorted += $EntriesUnsorted.Where({$_.OrderNum -eq 0}) | Sort-Object Name
+    $EntriesSorted += $EntriesUnsorted.Where({($_.OrderNum -ne 0) -and $_.IsVisible}) | Sort-Object OrderNum
+    $EntriesSorted += $EntriesUnsorted.Where({($_.OrderNum -eq 0) -and $_.IsVisible}) | Sort-Object Name
 
     If ($WindowMain_KPButtons_Grid.Children.Count -ne 0) {$WindowMain_KPButtons_Grid.Children.RemoveRange(0,$($WindowMain_KPButtons_Grid.Children.Count))}
     $Window_Main.Height = $InitialWindowHeight
@@ -1028,7 +1022,7 @@ function ArrangeEntries {
             $NewEntry.DBName = $DatabaseName
             If (($AttributedEntry).Count -eq 0) {
                 $NewEntry.OrderNum = 0
-                $NewEntry.IsVisible = $true
+                $NewEntry.IsVisible = $false
             } else {
                 if ($AttributedEntry.IsVisible) {
                     $NewEntry.OrderNum = $AttributedEntry.OrderNum
@@ -1043,8 +1037,8 @@ function ArrangeEntries {
     }
 
     [EntryBrief[]]$EntriesArranged = @()
-    $EntriesArranged += $EntriesAll.Where({($_.OrderNum -ne 0 -and $_.IsVisible)}) | Sort-Object OrderNum
-    $EntriesArranged += $EntriesAll.Where({($_.OrderNum -eq 0 -and $_.IsVisible)}) | Sort-Object Name
+    $EntriesArranged += $EntriesAll.Where({(($_.OrderNum -ne 0) -and $_.IsVisible)}) | Sort-Object OrderNum
+    $EntriesArranged += $EntriesAll.Where({(($_.OrderNum -eq 0) -and $_.IsVisible)}) | Sort-Object Name
     $EntriesArranged += $EntriesAll.Where({-Not $_.IsVisible}) | Sort-Object Name
     Return $EntriesArranged
 }
@@ -1058,43 +1052,27 @@ Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentV
 [System.Reflection.Assembly]::LoadWithPartialName('System.Drawing')          | out-null
 [System.Reflection.Assembly]::LoadWithPartialName('WindowsFormsIntegration') | out-null
 
-$icon = [System.Drawing.Icon]::ExtractAssociatedIcon($($ExecDir + "\app_icon.ico"))
-
 $Main_Tool_Icon = New-Object System.Windows.Forms.NotifyIcon
 $Main_Tool_Icon.Text = $appName + " v." + $appVersion
-$Main_Tool_Icon.Icon = $icon
+$Main_Tool_Icon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($($ExecDir + "\app_icon.ico"))
 $Main_Tool_Icon.Visible = $true
 
 $Menu_Exit = New-Object System.Windows.Forms.MenuItem
 $Menu_Exit.Text = "Exit"
 
+$Menu_Exit.add_Click({
+    SaveConfiguration
+    $Global:DBInstances | % {$_.DBMasterKey = $null}
+    $Window_main.OwnedWindows | % {$_.Close()}
+    $Window_main.Close()
+    [Environment]::Exit(1)
+})
+
 $contextmenu = New-Object System.Windows.Forms.ContextMenu
 $Main_Tool_Icon.ContextMenu = $contextmenu
 $Main_Tool_Icon.contextMenu.MenuItems.AddRange($Menu_Exit)
 
-<#
-$Main_Tool_Icon.Add_MouseMove({
-    if (-Not $Global:NotifyIconMouseOverOnce) {
-        $Global:NotifyIconMouseOverOnce = $true
-        $Global:PreviousWindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
-    }
-})
-#>
-
 $Main_Tool_Icon.Add_Click({
-    <#
-    if (-Not $Global:NotifyIconMouseC1ickonce) {
-        $Global:NotifyIconMouseC1ickonce = $true
-
-        $ForegroundWindoHandle = [SystemWindowsFunctions]::GetForegroundWindow()
-        [SystemWindowsFunctions]::SetWindowLong($ForegroundWindoHandle,-20,0x08000000)
-
-        If ($Global:PreviousWindowHand1e -ne $Global:WindowMainHandle) {
-            [SystemWindowsFunctions]::BringToFront($Global:PreviousWindowHandle)
-            [SystemWindowsFunctions]::SetWindowLong($Global:PreviousWindowHandle,-20,0x00000000)
-        }
-    }
-    #>
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
@@ -1102,7 +1080,6 @@ $Main_Tool_Icon.Add_Click({
         $Global:FadeAllowed = $true
     }
 })
-#>
 
 $Button_Filter.Add_Click({
     $Global:FadeAllowed = $false
@@ -1421,13 +1398,6 @@ $Button_More.Add_MouseRightButtonUp({
     $Window_SearchResults.Visibility = "Visible"
 })
 
-<#
-$Window_SearchResults.Add_MouseLeave({
-    $Window_SearchResults.Visibility = "Collapsed"
-})
-#>
-#$Window_SearchResults.Add_Deactivated({ $Window_SearchResults.Hide() })
-
 $SearchResults_Textbox_Search.Add_TextChanged({
     if ($this.Text.Length -ge 2) {
         [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
@@ -1440,11 +1410,6 @@ $SearchResults_Textbox_Search.Add_TextChanged({
 
 $SearchResults_Button_Close.Add_Click({
     $Window_SearchResults.Visibility = "Collapsed"
-    <#
-    $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
-    $SearchResults_Textbox_Search.Text = ""
-    $SearchResults_Textbox_Search.Focus() | Out-Null
-    #>
 })
 
 $Button_More.add_Click.Invoke({
@@ -1481,38 +1446,23 @@ $Window_main.Add_MouseLeave({
 })
 
 $Button_Clipboard.add_Click.Invoke({
-    Start-Sleep -Milliseconds 400
-    If ((Get-Clipboard -Raw) -match '[fF]\d{1,2};') { # Typing functional keys from clipboard, format Fn; - examples F2;F8;F10;
-        [regex]::Matches($(Get-Clipboard -Raw),"[fF]\d{1,2};") | % {
-            SendKey $(($_.Value).TrimEnd(";"))
-        }
-    } else {# Typing non Fn keys
-        (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
-    }
+    #Start-Sleep -Milliseconds 400
+    (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
     if ($CheckBox_AutoComplete.IsChecked) {[Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
 })
 
 $Button_Hide.add_Click.Invoke({$Global:FadeAllowed = $False ; WindowMain_FadeAnimation -From 2 -to -1 -DurationSec 0.6})
-
-$Menu_Exit.add_Click({
-    SaveConfiguration
-    $Global:DBInstances | % {$_.DBMasterKey = $null}
-    $Window_main.OwnedWindows | % {$_.Close()}
-    $Window_main.Close()
-    [Environment]::Exit(1)
-})
 
 $Window_main.Add_Loaded({
     $Window_main.Title = $appName + " v." + $appVersion
     $CheckBox_AlwaysOnTop.IsChecked = $Global:CheckBoxes[0]
     $CheckBox_AutoComplete.IsChecked = $Global:CheckBoxes[1]
     Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
-
-    #$WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
     
-    # Set Window never getting focus after activation - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
-    $Global:WindowMainHandle = [SystemWindowsFunctions]::GetForegroundWindow()
-    [SystemWindowsFunctions]::SetWindowLong($Global:WindowMainHandle,-20,0x08000000)
+    # Window does not become the foreground window when the user clicks it - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+    #$WindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+    $WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
+    [SystemWindowsFunctions]::SetWindowLong($WindowHandle,-20,0x08000000)
 
     WindowMain_FadeAnimation -From 0 -to 1 -DurationSec 0.6
 })
