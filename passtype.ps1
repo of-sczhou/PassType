@@ -808,8 +808,9 @@ Function SINGLE_KEY {
         [string]$KEY
     )
 
-    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY)
-    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
+    [Keyboard]::KeyPress([System.Windows.Forms.Keys]::$KEY)
+    #[Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY)
+    #[Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
     Start-Sleep -Milliseconds $Global:Delay
 }
 
