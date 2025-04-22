@@ -482,6 +482,12 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                     </TextBlock.RenderTransform>
                 </TextBlock>
             </Button>
+            <TextBox x:Name="Selector_TextBox_Delay" HorizontalAlignment="Left" Margin="96,2,0,0" TextWrapping="Wrap" Text="00" VerticalAlignment="Top" Width="21" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="#FFF9F4F4">
+                <TextBox.ToolTip>
+                    <ToolTip>Scroll mouse up and down to change typing delay</ToolTip>
+                </TextBox.ToolTip>
+            </TextBox>
+            <Label Content="ms" Margin="119,3,0,0" VerticalAlignment="Top" Height="18" Width="26" VerticalContentAlignment="Top" HorizontalAlignment="Left" Padding="0,0,0,0"/>
         </Grid>
 </Window>
 "@
@@ -765,7 +771,7 @@ function VerifyMasterKeys {
 If ($Global:DBInstances.Count -gt 0) { PassType_Entrance }
 
 # Common variables, objects
-$Global:Delay = 5
+[Byte]$Global:Delay = 5
 $InitialWindowHeight = $Window_main.Height
 $Global:FadeAllowed = $true
 
@@ -789,8 +795,13 @@ Function SHIFT_KEY {
         [string]$KEY
     )
 
-    [keyboard]::ShortcutKeys(@([System.Windows.Forms.Keys]::RShiftKey.value__,[System.Windows.Forms.Keys]::$KEY.value__))
-    Start-Sleep -Milliseconds $Global:Delay
+    #[keyboard]::ShortcutKeys(@([System.Windows.Forms.Keys]::ShiftKey.value__,[System.Windows.Forms.Keys]::$KEY.value__))
+    #Start-Sleep -Milliseconds $Global:Delay
+
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ShiftKey) ; Start-Sleep -Milliseconds $Global:Delay
 
 }
 
@@ -799,18 +810,25 @@ Function СTRL_KEY {
         [string]$KEY
     )
 
-    [keyboard]::ShortcutKeys(@([System.Windows.Forms.Keys]::RControlKey.value__,[System.Windows.Forms.Keys]::$KEY.value__))
-    Start-Sleep -Milliseconds $Global:Delay
+    #[keyboard]::ShortcutKeys(@([System.Windows.Forms.Keys]::ControlKey.value__,[System.Windows.Forms.Keys]::$KEY.value__))
+    #Start-Sleep -Milliseconds $Global:Delay
+
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::ControlKey) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY) ; Start-Sleep -Milliseconds $Global:Delay
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::ControlKey) ; Start-Sleep -Milliseconds $Global:Delay
 }
 
 Function SINGLE_KEY {
     param(
         [string]$KEY
     )
+    
+    #[Keyboard]::KeyPress([System.Windows.Forms.Keys]::$KEY)
+    #Start-Sleep -Milliseconds $Global:Delay
 
-    [Keyboard]::KeyPress([System.Windows.Forms.Keys]::$KEY)
-    #[Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY)
-    #[Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
+    [Keyboard]::KeyDown([System.Windows.Forms.Keys]::$KEY)
+    [Keyboard]::KeyUp([System.Windows.Forms.Keys]::$KEY)
     Start-Sleep -Milliseconds $Global:Delay
 }
 
@@ -1089,6 +1107,8 @@ $Button_Filter.Add_Click({
     try { $Window_Selector = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
     $XAMLSelectorWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Selector.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
+    $Selector_TextBox_Delay.Text = $Global:Delay.ToString()
+
 Function Selector_Button_Sources_BlinkAnimation {
     Param ([bool]$Animation)
     $DoubleAnimation = [System.Windows.Media.Animation.DoubleAnimation]::new()
@@ -1116,6 +1136,20 @@ Function Selector_Button_Sources_BlinkAnimation {
             If ($this.Text.Length -eq 0) { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Hidden } else { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Visible }
             $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
         }
+    })
+
+    $Selector_TextBox_Delay.Add_MouseWheel({
+        param (
+          [Parameter(Mandatory)][Object]$sender,
+          [Parameter(Mandatory)][EventArgs]$e
+        )
+        $CurrentDelay = [byte]$this.Text
+        If ($_.Delta -gt 0) {
+            If ($CurrentDelay -lt 99) {$CurrentDelay ++}
+        } else {
+            If ($CurrentDelay -gt 0) {$CurrentDelay --}
+        }
+        $this.Text = $CurrentDelay.ToString()
     })
 
     $Selector_Button_ClearSearchString.Add_Click({
@@ -1279,6 +1313,7 @@ Function Selector_Button_Sources_BlinkAnimation {
             $i += 1
         }
         $Global:AttributedEntries = $Global:CurrentEntries
+        $Global:Delay = [Byte]$Selector_TextBox_Delay.Text
 
         DrawButtons
         SaveConfiguration
