@@ -598,9 +598,6 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
         </Grid>
     </Window>
 "@
-$Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Window_SearchResults)
-try { $Window_SearchResults = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
-$XAMLMaster_Window_SearchResults.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_SearchResults.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
 Function WindowMain_FadeAnimation {
     Param ($From,$To,$DurationSec)
@@ -1421,34 +1418,39 @@ Function Selector_Button_Sources_BlinkAnimation {
 })
 
 $Button_More.Add_MouseRightButtonUp({
-    $Window_SearchResults.Show()
+    $Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Window_SearchResults)
+    try { $Window_SearchResults = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+    $XAMLMaster_Window_SearchResults.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_SearchResults.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
+    $SearchResults_Textbox_Search.Add_TextChanged({
+        if ($this.Text.Length -ge 2) {
+            [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
+            $ListView_SearchResults.ItemsSource = @($EntriesMatched)
+        } else {
+            #If ($this.Text.Length -eq 0) { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Visible }
+            $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
+        }
+    })
+
+    $SearchResults_Button_Close.Add_Click({
+        $Window_SearchResults.Close()
+    })
+
+    $ListView_SearchResults.Add_MouseLeftButtonUp({
+        $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($This.ItemsSource[$This.SelectedIndex].Uuid)]
+        $Button_More.Content = $Global:New_Button_More.Name
+        $Window_SearchResults.Visibility = "Collapsed"
+    })
+
     $Window_SearchResults.Top = $Window_Main.Top + $Window_Main.Height - 47
     $Window_SearchResults.Left = $Window_Main.Left + $Window_Main.Width/2 - $Window_SearchResults.Width/2
-    $Window_SearchResults.Visibility = "Visible"
+    $Window_SearchResults.Activate() | Out-Null
+    $Window_SearchResults.ShowDialog()
 })
 
-$SearchResults_Textbox_Search.Add_TextChanged({
-    if ($this.Text.Length -ge 2) {
-        [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
-        $ListView_SearchResults.ItemsSource = @($EntriesMatched)
-    } else {
-        #If ($this.Text.Length -eq 0) { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Visible }
-        $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
-    }
-})
-
-$SearchResults_Button_Close.Add_Click({
-    $Window_SearchResults.Visibility = "Collapsed"
-})
 
 $Button_More.add_Click.Invoke({
     Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.Name) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
-})
-
-$ListView_SearchResults.Add_MouseLeftButtonUp({
-    $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($This.ItemsSource[$This.SelectedIndex].Uuid)]
-    $Button_More.Content = $Global:New_Button_More.Name
-    $Window_SearchResults.Visibility = "Collapsed"
 })
 
 $Window_main.Top = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height) - $Window_main.Height
