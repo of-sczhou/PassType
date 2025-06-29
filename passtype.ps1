@@ -556,8 +556,8 @@ $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]
                 </ListView.Resources>
                 <ListView.View>
                     <GridView x:Name="GridView_SearchResults">
-                        <GridViewColumn Header="Name" Width="NaN" DisplayMemberBinding="{Binding Name}"/>
-                        <GridViewColumn Header="Database" Width="NaN"  DisplayMemberBinding ="{Binding DBName}"/>
+                        <GridViewColumn Header="Name" Width="150" DisplayMemberBinding="{Binding Name}"/>
+                        <GridViewColumn Header="Database" Width="105"  DisplayMemberBinding ="{Binding DBName}"/>
                         <GridViewColumn Header="Uuid" Width="NaN"  DisplayMemberBinding ="{Binding Uuid}"/>
                     </GridView>
                 </ListView.View>
