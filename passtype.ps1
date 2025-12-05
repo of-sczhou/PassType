@@ -1430,6 +1430,28 @@ $Button_More.Add_MouseRightButtonUp({
             #If ($this.Text.Length -eq 0) { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Visible }
             $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
         }
+        $ListView_SearchResults.SelectedIndex = 0
+    })
+
+    $SearchResults_Textbox_Search.Add_PreviewKeyDown({
+        param
+        (
+          [Parameter(Mandatory)][Object]$sender,
+          [Parameter(Mandatory)][Windows.Input.KeyEventArgs]$e
+        )
+
+        if (($e.Key -eq "Return") -and ($ListView_SearchResults.Items.Count -ne 0)) {
+            $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($ListView_SearchResults.ItemsSource[$ListView_SearchResults.SelectedIndex].Uuid)]
+            $Button_More.Content = $Global:New_Button_More.Name
+            $Window_SearchResults.Close()
+        }
+
+        if ($e.Key -eq "Esc") {$Window_SearchResults.Close()}
+
+        If (($e.Key -eq "Up") -and (($ListView_SearchResults.SelectedIndex -ne 0))) {$ListView_SearchResults.SelectedIndex -=1}
+
+        If (($e.Key -eq "Down") -and (($ListView_SearchResults.SelectedIndex -ne $ListView_SearchResults.Items.Count))) {$ListView_SearchResults.SelectedIndex +=1}
+
     })
 
     $SearchResults_Button_Close.Add_Click({
@@ -1439,12 +1461,17 @@ $Button_More.Add_MouseRightButtonUp({
     $ListView_SearchResults.Add_MouseLeftButtonUp({
         $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($This.ItemsSource[$This.SelectedIndex].Uuid)]
         $Button_More.Content = $Global:New_Button_More.Name
-        $Window_SearchResults.Visibility = "Collapsed"
+        $Window_SearchResults.Close()
+        #$Window_SearchResults.Visibility = "Collapsed"
     })
 
     $Window_SearchResults.Top = $Window_Main.Top + $Window_Main.Height - 47
     $Window_SearchResults.Left = $Window_Main.Left + $Window_Main.Width/2 - $Window_SearchResults.Width/2
     $Window_SearchResults.Activate() | Out-Null
+    $SearchResults_Textbox_Search.focus()
+
+    $Window_SearchResults.Add_Loaded({[SystemWindowsFunctions]::SetForegroundWindow((New-Object System.Windows.Interop.WindowInteropHelper($Window_SearchResults)).Handle)})
+    
     $Window_SearchResults.ShowDialog()
 })
 
