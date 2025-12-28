@@ -1090,6 +1090,7 @@ $Main_Tool_Icon.Add_Click({
     If ($_.Button -eq [Windows.Forms.MouseButtons]::Right) {
         $Main_Tool_Icon.GetType().GetMethod("ShowContextMenu",[System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic).Invoke($Main_Tool_Icon,$null)
     } else {
+        [SystemWindowsFunctions]::SetForegroundWindow($Global:MainWindowHandle)
         WindowMain_FadeAnimation -From -1 -To 2 -DurationSec 0.6
         $Global:FadeAllowed = $true
     }
@@ -1475,7 +1476,6 @@ $Button_More.Add_MouseRightButtonUp({
     $Window_SearchResults.ShowDialog()
 })
 
-
 $Button_More.add_Click.Invoke({
     Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.Name) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
 })
@@ -1519,8 +1519,8 @@ $Window_main.Add_Loaded({
     
     # Window does not become the foreground window when the user clicks it - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
     #$WindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
-    $WindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
-    [SystemWindowsFunctions]::SetWindowLong($WindowHandle,-20,0x08000000)
+    $Global:MainWindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
+    [SystemWindowsFunctions]::SetWindowLong($Global:MainWindowHandle,-20,0x08000000)
 
     WindowMain_FadeAnimation -From 0 -to 1 -DurationSec 0.6
 })
