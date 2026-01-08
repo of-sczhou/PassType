@@ -636,12 +636,12 @@ function PassType_Entrance {
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        Title="PassType Entrance" Height="74" Width="250" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" WindowStartupLocation="CenterScreen" WindowStyle="None" AllowsTransparency="True" Background="Transparent">
-    <Grid >
-        <TabControl x:Name="TabControl" Height="NaN" Margin="0,0,0,0" SelectedIndex="0"/>
-        <Button x:Name="Button_OK" Content="OK" HorizontalAlignment="Right" Margin="0,0,42,4" VerticalAlignment="Bottom" Height="20" Width="32" BorderBrush="#FFABADB3" IsTabStop="False"/>
-        <Button x:Name="Button_Quit" Content="Quit" HorizontalAlignment="Right" Margin="0,0,6,4" VerticalAlignment="Bottom" Width="32" BorderBrush="#FFABADB3" IsTabStop="False"/>
-    </Grid>
+        Title="PassType Entrance" Height="85" Width="250" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" WindowStartupLocation="CenterScreen" WindowStyle="None" AllowsTransparency="True" Background="Transparent" SnapsToDevicePixels="True">
+        <Grid >
+            <TabControl x:Name="TabControl" Height="NaN" Margin="0,0,0,0" SelectedIndex="0"/>
+            <Button x:Name="Button_OK" Content="OK" HorizontalAlignment="Right" Margin="0,0,44,4" VerticalAlignment="Bottom" Height="24" Width="32" BorderBrush="#FFABADB3" IsTabStop="False"/>
+            <Button x:Name="Button_Quit" Content="Quit" HorizontalAlignment="Right" Margin="0,0,7,4" VerticalAlignment="Bottom" Width="34" BorderBrush="#FFABADB3" IsTabStop="False"/>
+        </Grid>
 </Window>
 "@
 
