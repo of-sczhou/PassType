@@ -1059,8 +1059,6 @@ function ArrangeEntries {
 
 $Global:CurrentEntries = ArrangeEntries
 
-Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
-
 [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')    | out-null
 [System.Reflection.Assembly]::LoadWithPartialName('presentationframework')   | out-null
 [System.Reflection.Assembly]::LoadWithPartialName('System.Drawing')          | out-null
@@ -1096,16 +1094,29 @@ $Main_Tool_Icon.Add_Click({
     }
 })
 
-$Button_Filter.Add_Click({
-    $Global:FadeAllowed = $false
-    $Global:CurrentEntries = ArrangeEntries
-    $Global:CurrentEntriesCopy = $Global:CurrentEntries
+$Main_Tool_Icon.Add_DoubleClick({ # Completely close and recreate main window and place at the center of main display - can be used after system displays add/remove
+    $Window_Main.Close()
+    $Reader=(New-Object System.Xml.XmlNodeReader $XAMLMainWindow)
+    try { $Window_main = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+    $XAMLMainWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_main.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
-    $Reader=(New-Object System.Xml.XmlNodeReader $XAMLSelectorWindow)
-    try { $Window_Selector = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
-    $XAMLSelectorWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Selector.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+    DrawButtons
+    Invoke-Command -ScriptBlock $InitializeMainWindow
+})
 
-    $Selector_TextBox_Delay.Text = $Global:Delay.ToString()
+$InitializeMainWindow = {
+    Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
+
+    $Button_Filter.Add_Click({
+        $Global:FadeAllowed = $false
+        $Global:CurrentEntries = ArrangeEntries
+        $Global:CurrentEntriesCopy = $Global:CurrentEntries
+
+        $Reader=(New-Object System.Xml.XmlNodeReader $XAMLSelectorWindow)
+        try { $Window_Selector = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+        $XAMLSelectorWindow.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Selector.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
+        $Selector_TextBox_Delay.Text = $Global:Delay.ToString()
 
 Function Selector_Button_Sources_BlinkAnimation {
     Param ([bool]$Animation)
@@ -1122,412 +1133,412 @@ Function Selector_Button_Sources_BlinkAnimation {
     }
 }
 
-    Selector_Button_Sources_BlinkAnimation $($Global:DBInstances.Count -eq 0)
+        Selector_Button_Sources_BlinkAnimation $($Global:DBInstances.Count -eq 0)
 
-    $Window_Selector.add_MouseLeftButtonDown({$Window_Selector.DragMove()})
+        $Window_Selector.add_MouseLeftButtonDown({$Window_Selector.DragMove()})
 
-    $Selector_Textbox_Search.Add_TextChanged({
-        if ($this.Text.Length -ge 2) {
-            [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
-            $ListView_Selector.ItemsSource = @($EntriesMatched)
-        } else {
-            If ($this.Text.Length -eq 0) { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Hidden } else { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Visible }
-            $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
-        }
-    })
-
-    $Selector_TextBox_Delay.Add_MouseWheel({
-        param (
-          [Parameter(Mandatory)][Object]$sender,
-          [Parameter(Mandatory)][EventArgs]$e
-        )
-        $CurrentDelay = [byte]$this.Text
-        If ($_.Delta -gt 0) {
-            If ($CurrentDelay -lt 99) {$CurrentDelay ++}
-        } else {
-            If ($CurrentDelay -gt 0) {$CurrentDelay --}
-        }
-        $this.Text = $CurrentDelay.ToString()
-    })
-
-    $Selector_Button_ClearSearchString.Add_Click({
-        $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
-        $Selector_Textbox_Search.Text = ""
-        $Selector_Textbox_Search.Focus() | Out-Null
-    })
-
-    $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
-    $ListView_Selector.SelectedIndex = 0
-
-    $Selector_Button_Sources.Add_Click({
-        $Reader=(New-Object System.Xml.XmlNodeReader $XAMLWindow_Sources)
-        try { $Window_Sources = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
-        $XAMLWindow_Sources.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Sources.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
-
-        $Window_Sources.add_MouseLeftButtonDown({$Window_Sources.DragMove()})
-
-        Class DBRecord {
-            [string]$DBPath
-            [string]$DBKeyPath
-            [string]$DBName
-            [bool]$DBAccessVerified
-        }
-
-        $Global:SelectedColumnIndex = 0
-
-        $DBRecords = New-Object System.Collections.ObjectModel.ObservableCollection[DBRecord]
-
-        $Global:DBInstances | % {
-            $DBRecord = [DBRecord]::new()
-            $DBRecord.DBPath = $_.DBPath
-            $DBRecord.DBName = $_.DBName
-            $DBRecord.DBKeyPath = $_.DBKeyPath
-            $DBRecord.DBAccessVerified = $true
-            $DBRecords.Add($DBRecord)
-        }
-        
-        $Sources_DataGrid.ItemsSource = $DBRecords
-
-        $Sources_Button_Insert.Add_Click({
-            $DBRecord = [DBRecord]::new()
-            $DBRecord.DBPath = ""
-            $DBRecord.DBKeyPath = ""
-            $DBRecord.DBName = ""
-            $DBRecord.DBAccessVerified = $false
-            $DBRecords.Add($DBRecord)
-        })
-
-        $Sources_Button_Verify.Add_Click({
-            if ($Sources_DataGrid.SelectedIndex -ne -1) {
-                $Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Password_Window)
-                try { $Window_Password = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
-                $XAMLMaster_Password_Window.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Password.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
-
-                $DBPath = $DBRecords[$Sources_DataGrid.SelectedIndex].DBPath
-                $DBKeyPath = $DBRecords[$Sources_DataGrid.SelectedIndex].DBKeyPath
-
-                $BottonFO_Window_Password.Add_Click({
-                    If ($DBKeyPath) {
-                        New-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -DatabasePath $DBPath -UseMasterKey -KeyPath $DBKeyPath
-                    } else {
-                        New-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -DatabasePath $DBPath -UseMasterKey
-                    }
-                    
-                    Try {
-                        $DBName = (Get-KeePassGroup -DatabaseProfileName 'TestConnection' -MasterKey $PasswordBox_Window_Password.SecurePassword)[0].Name
-                        $DBRecords[$Sources_DataGrid.SelectedIndex].DBAccessVerified = $true
-                        $DBRecords[$Sources_DataGrid.SelectedIndex].DBName = $DBName
-                        $Sources_DataGrid.Items.Refresh()
-                        Remove-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -Confirm:$false
-                        $Window_Password.Close()
-                    } catch {
-                        Remove-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -Confirm:$false
-                        [System.Windows.MessageBox]::Show("Error connecting to selected database",$([System.Windows.MessageBoxButton]::YesNo))
-                    }
-                })
-                
-                $CurrentLanguageManager = [System.Windows.Input.InputLanguageManager]::Current
-                $Label_Window_Password.Content = ($CurrentLanguageManager).CurrentInputLanguage.TwoLetterISOLanguageName.ToUpper()
-                $CurrentLanguageManager.add_InputLanguageChanged({
-                    Param(
-                        [System.Object]$Sender,
-                        [System.Windows.Input.InputLanguageChangedEventArgs]$e
-                    )
-
-                    Try { $Label_NewTerm_Language.Content = $e.NewLanguage.TwoLetterISOLanguageName.ToUpper() } catch {}
-                    $Label_Window_Password.Content = $e.NewLanguage.TwoLetterISOLanguageName.ToUpper()
-                })
-
-                $PasswordBox_Window_Password.Focus() | Out-Null
-                $Window_Password.Owner = $Window_Sources
-                $Window_Password.Activate() | Out-Null
-                $Window_Password.Focus() | Out-Null
-                $Window_Password.ShowDialog() | Out-Null
-            }
-        })
-
-        $Sources_DataGrid.Add_MouseDoubleClick({
-            $OpenFileDialog = New-Object Microsoft.Win32.OpenFileDialog
-            $OpenFileDialog.Title = "Select File"
-            $OpenFileDialog.InitialDirectory = ""
-            $OpenFileDialog.Filter = "All Supported Files|*"
-            $OpenFileDialog.Multiselect = $False
-    
-            if ($OpenFileDialog.ShowDialog()) {
-                Switch ($Global:SelectedColumnIndex) {
-                    0 {$DBRecords[$Sources_DataGrid.SelectedIndex].DBPath = $OpenFileDialog.FileName}
-                    1 {$DBRecords[$Sources_DataGrid.SelectedIndex].DBKeyPath = $OpenFileDialog.FileName}
-                }
-                $DBRecords[$Sources_DataGrid.SelectedIndex].DBAccessVerified = $false
-                $Sources_DataGrid.Items.Refresh()
-            }
-            $Sources_DataGrid.CancelEdit()
-        })
-
-        $Sources_Button_Remove.Add_Click({
-            if ($Sources_DataGrid.SelectedIndex -ne -1) {
-                $DBRecords.RemoveAt($Sources_DataGrid.SelectedIndex)
-            }
-        })
-        
-        $Sources_Button_Save.Add_Click({
-            if ($DBRecords | ? {-Not $_.DBAccessVerified}) {
-                [System.Windows.MessageBox]::Show("All Entries must be verified before save")
+        $Selector_Textbox_Search.Add_TextChanged({
+            if ($this.Text.Length -ge 2) {
+                [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
+                $ListView_Selector.ItemsSource = @($EntriesMatched)
             } else {
-                [DBInstance[]]$Global:DBInstances = @()
-                $Global:CurrentEntries = $Global:CurrentEntries | ? {$DBRecords.DBName.IndexOf($_.DBName) -ne -1}
-                $DBRecords | % {
-                    [DBInstance]$NewDBInstance = [DBInstance]::new()
-                    $NewDBInstance.DBName = $_.DBName
-                    $NewDBInstance.DBKeyPath = $_.DBKeyPath
-                    $NewDBInstance.DBPath = $_.DBPath
-                    $Global:DBInstances += $NewDBInstance
-                }
-                SaveConfiguration
-                $Window_main.OwnedWindows | % {$_.Close()}
-                $Window_main.Close()
-                Start powershell $PSCommandPath
-                [Environment]::Exit(1)
+                If ($this.Text.Length -eq 0) { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Hidden } else { $Selector_Button_ClearSearchString.Visibility = [System.Windows.Visibility]::Visible }
+                $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
             }
         })
 
-        $Sources_Button_Cancel.Add_Click({ $Window_Sources.Close() })
-        
-        $Sources_DataGrid.Add_BeginningEdit({ $Global:SelectedColumnIndex = $_.Column.DisplayIndex })
-
-        $Window_Sources.Owner = $Window_Selector
-        $Window_Sources.Activate() | Out-Null
-        $Window_Sources.Focus() | Out-Null
-        $Window_Sources.ShowDialog() | Out-Null
-    })
-
-    $Selector_Button_Apply.Add_Click({
-        $i = 0 ; $OrderNum = 1
-        $Global:CurrentEntries | % {
-            If ($_.IsVisible) {
-                $Global:CurrentEntries[$i].OrderNum = $OrderNum
-                $OrderNum += 1
-            } else { $Global:CurrentEntries[$i].OrderNum = 0 }
-            $i += 1
-        }
-        $Global:AttributedEntries = $Global:CurrentEntries
-        $Global:Delay = [Byte]$Selector_TextBox_Delay.Text
-
-        DrawButtons
-        SaveConfiguration
-        $Window_Selector.Close() | Out-Null
-        $Global:FadeAllowed = $true
-    })
-
-    $Selector_Button_Cancel.Add_Click({
-        $Global:CurrentEntries = $Global:CurrentEntriesCopy
-        $Window_Selector.Close()
-        $Global:FadeAllowed = $true
-    })
-
-    $Window_Selector.Add_Loaded({
-        $Window_Selector.Activate() | Out-Null
-        $Selector_Textbox_Search.Focus() | Out-Null
-    })
-
-    $Selector_Button_Up.Add_Click({
-        if ($ListView_Selector.SelectedIndex -ne 0) {
-            $Index = $ListView_Selector.SelectedIndex
-            $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex -1]
-            $Global:CurrentEntries[$ListView_Selector.SelectedIndex - 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
-            $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
-            $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
-            $ListView_Selector.SelectedIndex = $Index - 1
-        }
-    })
-
-    $Selector_Button_Down.Add_Click({
-        if ($ListView_Selector.SelectedIndex -lt ($ListView_Selector.Items.Count - 1)) {
-            $Index = $ListView_Selector.SelectedIndex
-            $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1]
-            $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
-            $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
-            $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
-            $ListView_Selector.SelectedIndex = $Index + 1
-        }
-    })
-
-    $Selector_Button_KeePass.Add_Click({
-        if (($Global:KeePass_Path -eq "Undefined") -or [String]::IsNullOrEmpty($Global:KeePass_Path)) {
-            $Global:KeePass_Path = "Undefined"
-            $objForm = New-Object System.Windows.Forms.OpenFileDialog
-            $objForm.Title = "Select location of keepass.exe"
-            $objForm.InitialDirectory = $env:SystemDrive
-            $objForm.Filter = "keepass.exe|keepass.exe"
-            $objForm.Multiselect = $false
-            $objForm.ShowDialog()
-            if ($objForm.FileName) {$Global:KeePass_Path = $objForm.FileName}
-        }
-
-        If ($Global:KeePass_Path -ne "Undefined") {
-            If (Get-Process -Name KeePass -ea 0) {
-                Start-Process -FilePath $Global:KeePass_Path -ArgumentList @("-exit-all")
-                While (Get-Process -Name KeePass -ea 0) {Start-Sleep -Milliseconds 200}
+        $Selector_TextBox_Delay.Add_MouseWheel({
+            param (
+              [Parameter(Mandatory)][Object]$sender,
+              [Parameter(Mandatory)][EventArgs]$e
+            )
+            $CurrentDelay = [byte]$this.Text
+            If ($_.Delta -gt 0) {
+                If ($CurrentDelay -lt 99) {$CurrentDelay ++}
+            } else {
+                If ($CurrentDelay -gt 0) {$CurrentDelay --}
             }
-        
-            # Select User XML config for launch Keepass
-            if (Test-Path @($env:APPDATA + "\KeePass\KeePass.config.xml") -ea 0) { # use user's config and modify some nodes
-                [XML]$XML_config = Get-Content -Path @($env:APPDATA + "\KeePass\KeePass.config.xml")
-                Try {
-                    If (-Not $XML_config.Configuration.Application.Start.MinimizedAndLocked) {
-                        $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("MinimizedAndLocked")) | Out-Null
-                    }$XML_config.Configuration.Application.Start.MinimizedAndLocked = "false"
-                } catch {}
+            $this.Text = $CurrentDelay.ToString()
+        })
 
-                Try {
-                    If (-Not $XML_config.Configuration.Application.Start.OpenLastFile) {
-                        $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("OpenLastFile")) | Out-Null
-                    }$XML_config.Configuration.Application.Start.OpenLastFile = "false"
-                } catch {}
-                $XML_config.Save(@($env:TEMP + "\KeePass.config.xml"))
-                $XMLPath = @($env:TEMP + "\KeePass.config.xml")
-            } else {$XMLPath = "$ExecDir\KeePass.config.xml"} # Use config file from script folder
-            & $Global:KeePass_Path "-cfg-local:$XMLPath"
-            While (-Not (Get-Process -Name KeePass -ea 0)) {Start-Sleep -Milliseconds 200}
+        $Selector_Button_ClearSearchString.Add_Click({
+            $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+            $Selector_Textbox_Search.Text = ""
+            $Selector_Textbox_Search.Focus() | Out-Null
+        })
+
+        $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+        $ListView_Selector.SelectedIndex = 0
+
+        $Selector_Button_Sources.Add_Click({
+            $Reader=(New-Object System.Xml.XmlNodeReader $XAMLWindow_Sources)
+            try { $Window_Sources = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+            $XAMLWindow_Sources.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Sources.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
+            $Window_Sources.add_MouseLeftButtonDown({$Window_Sources.DragMove()})
+
+            Class DBRecord {
+                [string]$DBPath
+                [string]$DBKeyPath
+                [string]$DBName
+                [bool]$DBAccessVerified
+            }
+
+            $Global:SelectedColumnIndex = 0
+
+            $DBRecords = New-Object System.Collections.ObjectModel.ObservableCollection[DBRecord]
 
             $Global:DBInstances | % {
-                Try {
-                  Start-Sleep -Seconds 1
-                  $KeePassProcess = New-Object System.Diagnostics.Process
-                  $KeePassProcess.StartInfo.FileName = $Global:KeePass_Path
-                  if ($_.DBKeyPath) {
-                    $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-keyfile:$($_.DBKeyPath)","-pw-stdin"
-                  } else {
-                    $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-pw-stdin"
-                  }
-                  $KeePassProcess.StartInfo.UseShellExecute = $false
-                  $KeePassProcess.StartInfo.RedirectStandardInput = $true
-                  $KeePassProcess.Start()
+                $DBRecord = [DBRecord]::new()
+                $DBRecord.DBPath = $_.DBPath
+                $DBRecord.DBName = $_.DBName
+                $DBRecord.DBKeyPath = $_.DBKeyPath
+                $DBRecord.DBAccessVerified = $true
+                $DBRecords.Add($DBRecord)
+            }
+        
+            $Sources_DataGrid.ItemsSource = $DBRecords
 
-                  $StdIn = $KeePassProcess.StandardInput
-                  $StdIn.WriteLine($([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($_.DBMasterKey))))
-                  While (-Not $KeePassProcess.Responding) {Start-Sleep -Milliseconds 100}
-                } Finally {
-                      if($StdIn) { $StdIn.Close() }
+            $Sources_Button_Insert.Add_Click({
+                $DBRecord = [DBRecord]::new()
+                $DBRecord.DBPath = ""
+                $DBRecord.DBKeyPath = ""
+                $DBRecord.DBName = ""
+                $DBRecord.DBAccessVerified = $false
+                $DBRecords.Add($DBRecord)
+            })
+
+            $Sources_Button_Verify.Add_Click({
+                if ($Sources_DataGrid.SelectedIndex -ne -1) {
+                    $Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Password_Window)
+                    try { $Window_Password = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+                    $XAMLMaster_Password_Window.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_Password.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+
+                    $DBPath = $DBRecords[$Sources_DataGrid.SelectedIndex].DBPath
+                    $DBKeyPath = $DBRecords[$Sources_DataGrid.SelectedIndex].DBKeyPath
+
+                    $BottonFO_Window_Password.Add_Click({
+                        If ($DBKeyPath) {
+                            New-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -DatabasePath $DBPath -UseMasterKey -KeyPath $DBKeyPath
+                        } else {
+                            New-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -DatabasePath $DBPath -UseMasterKey
+                        }
+                    
+                        Try {
+                            $DBName = (Get-KeePassGroup -DatabaseProfileName 'TestConnection' -MasterKey $PasswordBox_Window_Password.SecurePassword)[0].Name
+                            $DBRecords[$Sources_DataGrid.SelectedIndex].DBAccessVerified = $true
+                            $DBRecords[$Sources_DataGrid.SelectedIndex].DBName = $DBName
+                            $Sources_DataGrid.Items.Refresh()
+                            Remove-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -Confirm:$false
+                            $Window_Password.Close()
+                        } catch {
+                            Remove-KeePassDatabaseConfiguration -DatabaseProfileName 'TestConnection' -Confirm:$false
+                            [System.Windows.MessageBox]::Show("Error connecting to selected database",$([System.Windows.MessageBoxButton]::YesNo))
+                        }
+                    })
+                
+                    $CurrentLanguageManager = [System.Windows.Input.InputLanguageManager]::Current
+                    $Label_Window_Password.Content = ($CurrentLanguageManager).CurrentInputLanguage.TwoLetterISOLanguageName.ToUpper()
+                    $CurrentLanguageManager.add_InputLanguageChanged({
+                        Param(
+                            [System.Object]$Sender,
+                            [System.Windows.Input.InputLanguageChangedEventArgs]$e
+                        )
+
+                        Try { $Label_NewTerm_Language.Content = $e.NewLanguage.TwoLetterISOLanguageName.ToUpper() } catch {}
+                        $Label_Window_Password.Content = $e.NewLanguage.TwoLetterISOLanguageName.ToUpper()
+                    })
+
+                    $PasswordBox_Window_Password.Focus() | Out-Null
+                    $Window_Password.Owner = $Window_Sources
+                    $Window_Password.Activate() | Out-Null
+                    $Window_Password.Focus() | Out-Null
+                    $Window_Password.ShowDialog() | Out-Null
+                }
+            })
+
+            $Sources_DataGrid.Add_MouseDoubleClick({
+                $OpenFileDialog = New-Object Microsoft.Win32.OpenFileDialog
+                $OpenFileDialog.Title = "Select File"
+                $OpenFileDialog.InitialDirectory = ""
+                $OpenFileDialog.Filter = "All Supported Files|*"
+                $OpenFileDialog.Multiselect = $False
+    
+                if ($OpenFileDialog.ShowDialog()) {
+                    Switch ($Global:SelectedColumnIndex) {
+                        0 {$DBRecords[$Sources_DataGrid.SelectedIndex].DBPath = $OpenFileDialog.FileName}
+                        1 {$DBRecords[$Sources_DataGrid.SelectedIndex].DBKeyPath = $OpenFileDialog.FileName}
+                    }
+                    $DBRecords[$Sources_DataGrid.SelectedIndex].DBAccessVerified = $false
+                    $Sources_DataGrid.Items.Refresh()
+                }
+                $Sources_DataGrid.CancelEdit()
+            })
+
+            $Sources_Button_Remove.Add_Click({
+                if ($Sources_DataGrid.SelectedIndex -ne -1) {
+                    $DBRecords.RemoveAt($Sources_DataGrid.SelectedIndex)
+                }
+            })
+        
+            $Sources_Button_Save.Add_Click({
+                if ($DBRecords | ? {-Not $_.DBAccessVerified}) {
+                    [System.Windows.MessageBox]::Show("All Entries must be verified before save")
+                } else {
+                    [DBInstance[]]$Global:DBInstances = @()
+                    $Global:CurrentEntries = $Global:CurrentEntries | ? {$DBRecords.DBName.IndexOf($_.DBName) -ne -1}
+                    $DBRecords | % {
+                        [DBInstance]$NewDBInstance = [DBInstance]::new()
+                        $NewDBInstance.DBName = $_.DBName
+                        $NewDBInstance.DBKeyPath = $_.DBKeyPath
+                        $NewDBInstance.DBPath = $_.DBPath
+                        $Global:DBInstances += $NewDBInstance
+                    }
+                    SaveConfiguration
+                    $Window_main.OwnedWindows | % {$_.Close()}
+                    $Window_main.Close()
+                    Start powershell $PSCommandPath
+                    [Environment]::Exit(1)
+                }
+            })
+
+            $Sources_Button_Cancel.Add_Click({ $Window_Sources.Close() })
+        
+            $Sources_DataGrid.Add_BeginningEdit({ $Global:SelectedColumnIndex = $_.Column.DisplayIndex })
+
+            $Window_Sources.Owner = $Window_Selector
+            $Window_Sources.Activate() | Out-Null
+            $Window_Sources.Focus() | Out-Null
+            $Window_Sources.ShowDialog() | Out-Null
+        })
+
+        $Selector_Button_Apply.Add_Click({
+            $i = 0 ; $OrderNum = 1
+            $Global:CurrentEntries | % {
+                If ($_.IsVisible) {
+                    $Global:CurrentEntries[$i].OrderNum = $OrderNum
+                    $OrderNum += 1
+                } else { $Global:CurrentEntries[$i].OrderNum = 0 }
+                $i += 1
+            }
+            $Global:AttributedEntries = $Global:CurrentEntries
+            $Global:Delay = [Byte]$Selector_TextBox_Delay.Text
+
+            DrawButtons
+            SaveConfiguration
+            $Window_Selector.Close() | Out-Null
+            $Global:FadeAllowed = $true
+        })
+
+        $Selector_Button_Cancel.Add_Click({
+            $Global:CurrentEntries = $Global:CurrentEntriesCopy
+            $Window_Selector.Close()
+            $Global:FadeAllowed = $true
+        })
+
+        $Window_Selector.Add_Loaded({
+            $Window_Selector.Activate() | Out-Null
+            $Selector_Textbox_Search.Focus() | Out-Null
+        })
+
+        $Selector_Button_Up.Add_Click({
+            if ($ListView_Selector.SelectedIndex -ne 0) {
+                $Index = $ListView_Selector.SelectedIndex
+                $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex -1]
+                $Global:CurrentEntries[$ListView_Selector.SelectedIndex - 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
+                $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
+                $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+                $ListView_Selector.SelectedIndex = $Index - 1
+            }
+        })
+
+        $Selector_Button_Down.Add_Click({
+            if ($ListView_Selector.SelectedIndex -lt ($ListView_Selector.Items.Count - 1)) {
+                $Index = $ListView_Selector.SelectedIndex
+                $EntryBuffer = $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1]
+                $Global:CurrentEntries[$ListView_Selector.SelectedIndex + 1] = $Global:CurrentEntries[$ListView_Selector.SelectedIndex]
+                $Global:CurrentEntries[$ListView_Selector.SelectedIndex] = $EntryBuffer
+                $ListView_Selector.ItemsSource = @($Global:CurrentEntries)
+                $ListView_Selector.SelectedIndex = $Index + 1
+            }
+        })
+
+        $Selector_Button_KeePass.Add_Click({
+            if (($Global:KeePass_Path -eq "Undefined") -or [String]::IsNullOrEmpty($Global:KeePass_Path)) {
+                $Global:KeePass_Path = "Undefined"
+                $objForm = New-Object System.Windows.Forms.OpenFileDialog
+                $objForm.Title = "Select location of keepass.exe"
+                $objForm.InitialDirectory = $env:SystemDrive
+                $objForm.Filter = "keepass.exe|keepass.exe"
+                $objForm.Multiselect = $false
+                $objForm.ShowDialog()
+                if ($objForm.FileName) {$Global:KeePass_Path = $objForm.FileName}
+            }
+
+            If ($Global:KeePass_Path -ne "Undefined") {
+                If (Get-Process -Name KeePass -ea 0) {
+                    Start-Process -FilePath $Global:KeePass_Path -ArgumentList @("-exit-all")
+                    While (Get-Process -Name KeePass -ea 0) {Start-Sleep -Milliseconds 200}
+                }
+        
+                # Select User XML config for launch Keepass
+                if (Test-Path @($env:APPDATA + "\KeePass\KeePass.config.xml") -ea 0) { # use user's config and modify some nodes
+                    [XML]$XML_config = Get-Content -Path @($env:APPDATA + "\KeePass\KeePass.config.xml")
+                    Try {
+                        If (-Not $XML_config.Configuration.Application.Start.MinimizedAndLocked) {
+                            $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("MinimizedAndLocked")) | Out-Null
+                        }$XML_config.Configuration.Application.Start.MinimizedAndLocked = "false"
+                    } catch {}
+
+                    Try {
+                        If (-Not $XML_config.Configuration.Application.Start.OpenLastFile) {
+                            $XML_config.Configuration.Application.Start.AppendChild($XML_config.CreateElement("OpenLastFile")) | Out-Null
+                        }$XML_config.Configuration.Application.Start.OpenLastFile = "false"
+                    } catch {}
+                    $XML_config.Save(@($env:TEMP + "\KeePass.config.xml"))
+                    $XMLPath = @($env:TEMP + "\KeePass.config.xml")
+                } else {$XMLPath = "$ExecDir\KeePass.config.xml"} # Use config file from script folder
+                & $Global:KeePass_Path "-cfg-local:$XMLPath"
+                While (-Not (Get-Process -Name KeePass -ea 0)) {Start-Sleep -Milliseconds 200}
+
+                $Global:DBInstances | % {
+                    Try {
+                      Start-Sleep -Seconds 1
+                      $KeePassProcess = New-Object System.Diagnostics.Process
+                      $KeePassProcess.StartInfo.FileName = $Global:KeePass_Path
+                      if ($_.DBKeyPath) {
+                        $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-keyfile:$($_.DBKeyPath)","-pw-stdin"
+                      } else {
+                        $KeePassProcess.StartInfo.Arguments = $($_.DBPath),"-pw-stdin"
+                      }
+                      $KeePassProcess.StartInfo.UseShellExecute = $false
+                      $KeePassProcess.StartInfo.RedirectStandardInput = $true
+                      $KeePassProcess.Start()
+
+                      $StdIn = $KeePassProcess.StandardInput
+                      $StdIn.WriteLine($([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($_.DBMasterKey))))
+                      While (-Not $KeePassProcess.Responding) {Start-Sleep -Milliseconds 100}
+                    } Finally {
+                          if($StdIn) { $StdIn.Close() }
+                    }
                 }
             }
-        }
+        })
+
+        $Window_Selector.Owner = $Window_main
+        $Window_Selector.ShowDialog()
     })
 
-    $Window_Selector.Owner = $Window_main
-    $Window_Selector.ShowDialog()
-})
+    $Button_More.Add_MouseRightButtonUp({
+        $Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Window_SearchResults)
+        try { $Window_SearchResults = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
+        $XAMLMaster_Window_SearchResults.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_SearchResults.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
 
-$Button_More.Add_MouseRightButtonUp({
-    $Reader=(New-Object System.Xml.XmlNodeReader $XAMLMaster_Window_SearchResults)
-    try { $Window_SearchResults = [Windows.Markup.XamlReader]::Load($Reader) } catch { Write-Warning $_.Exception ; throw }
-    $XAMLMaster_Window_SearchResults.SelectNodes("//*[@*[contains(translate(name(.),'n','N'),'Name')]]") | % { New-Variable  -Name $_.Name -Value $Window_SearchResults.FindName($_.Name) -Force -ErrorAction SilentlyContinue}
+        $SearchResults_Textbox_Search.Add_TextChanged({
+            if ($this.Text.Length -ge 2) {
+                [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
+                $ListView_SearchResults.ItemsSource = @($EntriesMatched)
+            } else {
+                #If ($this.Text.Length -eq 0) { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Visible }
+                $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
+            }
+            $ListView_SearchResults.SelectedIndex = 0
+        })
 
-    $SearchResults_Textbox_Search.Add_TextChanged({
-        if ($this.Text.Length -ge 2) {
-            [EntryBrief[]]$EntriesMatched = $Global:CurrentEntries.Where({$_.Name -like "*$($this.Text)*"})
-            $ListView_SearchResults.ItemsSource = @($EntriesMatched)
-        } else {
-            #If ($this.Text.Length -eq 0) { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Hidden } else { $SearchResults_Button_Close.Visibility = [System.Windows.Visibility]::Visible }
-            $ListView_SearchResults.ItemsSource = @($Global:CurrentEntries)
-        }
-        $ListView_SearchResults.SelectedIndex = 0
-    })
+        $SearchResults_Textbox_Search.Add_PreviewKeyDown({
+            param
+            (
+              [Parameter(Mandatory)][Object]$sender,
+              [Parameter(Mandatory)][Windows.Input.KeyEventArgs]$e
+            )
 
-    $SearchResults_Textbox_Search.Add_PreviewKeyDown({
-        param
-        (
-          [Parameter(Mandatory)][Object]$sender,
-          [Parameter(Mandatory)][Windows.Input.KeyEventArgs]$e
-        )
+            if (($e.Key -eq "Return") -and ($ListView_SearchResults.Items.Count -ne 0)) {
+                $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($ListView_SearchResults.ItemsSource[$ListView_SearchResults.SelectedIndex].Uuid)]
+                $Button_More.Content = $Global:New_Button_More.Name
+                $Window_SearchResults.Close()
+            }
 
-        if (($e.Key -eq "Return") -and ($ListView_SearchResults.Items.Count -ne 0)) {
-            $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($ListView_SearchResults.ItemsSource[$ListView_SearchResults.SelectedIndex].Uuid)]
+            if ($e.Key -eq "Esc") {$Window_SearchResults.Close()}
+
+            If (($e.Key -eq "Up") -and (($ListView_SearchResults.SelectedIndex -ne 0))) {$ListView_SearchResults.SelectedIndex -=1}
+
+            If (($e.Key -eq "Down") -and (($ListView_SearchResults.SelectedIndex -ne $ListView_SearchResults.Items.Count))) {$ListView_SearchResults.SelectedIndex +=1}
+
+        })
+
+        $SearchResults_Button_Close.Add_Click({
+            $Window_SearchResults.Close()
+        })
+
+        $ListView_SearchResults.Add_MouseLeftButtonUp({
+            $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($This.ItemsSource[$This.SelectedIndex].Uuid)]
             $Button_More.Content = $Global:New_Button_More.Name
             $Window_SearchResults.Close()
+            #$Window_SearchResults.Visibility = "Collapsed"
+        })
+
+        $Window_SearchResults.Top = $Window_Main.Top + $Window_Main.Height - 47
+        $Window_SearchResults.Left = $Window_Main.Left + $Window_Main.Width/2 - $Window_SearchResults.Width/2
+        $Window_SearchResults.Activate() | Out-Null
+        $SearchResults_Textbox_Search.focus()
+
+        $Window_SearchResults.Add_Loaded({[SystemWindowsFunctions]::SetForegroundWindow((New-Object System.Windows.Interop.WindowInteropHelper($Window_SearchResults)).Handle)})
+    
+        $Window_SearchResults.ShowDialog()
+    })
+
+    $Button_More.add_Click.Invoke({
+        Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.Name) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
+    })
+
+    $CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) -Force })
+    $CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
+
+    $Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
+
+    $Window_main.Add_MouseEnter({ If ($Window_main.Opacity -ne 1) { WindowMain_FadeAnimation -From $Window_main.Opacity -to 2 -DurationSec 0.6 } })
+
+    $Window_main.Add_MouseWheel({ WindowMain_FadeAnimation -From $Window_main.Opacity -to 0 -DurationSec 0.4 })
+
+    $Window_main.Add_MouseLeave({
+        If ($Global:FadeAllowed) {
+            $Animation = [System.Windows.Media.Animation.DoubleAnimation]::new()
+            $Animation.From = $Window_main.Opacity
+            $Animation.To = 0.25
+            $Animation.BeginTime = New-TimeSpan -Seconds 15
+            $Animation.Duration = New-TimeSpan -Seconds 0.6
+            $Window_main.BeginAnimation([System.Windows.Window]::OpacityProperty, $Animation)
         }
-
-        if ($e.Key -eq "Esc") {$Window_SearchResults.Close()}
-
-        If (($e.Key -eq "Up") -and (($ListView_SearchResults.SelectedIndex -ne 0))) {$ListView_SearchResults.SelectedIndex -=1}
-
-        If (($e.Key -eq "Down") -and (($ListView_SearchResults.SelectedIndex -ne $ListView_SearchResults.Items.Count))) {$ListView_SearchResults.SelectedIndex +=1}
-
     })
 
-    $SearchResults_Button_Close.Add_Click({
-        $Window_SearchResults.Close()
+    $Button_Clipboard.add_Click.Invoke({
+        #Start-Sleep -Milliseconds 400
+        (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
+        if ($CheckBox_AutoComplete.IsChecked) {[Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
     })
 
-    $ListView_SearchResults.Add_MouseLeftButtonUp({
-        $Global:New_Button_More = $Global:CurrentEntries[$Global:CurrentEntries.uuid.IndexOf($This.ItemsSource[$This.SelectedIndex].Uuid)]
-        $Button_More.Content = $Global:New_Button_More.Name
-        $Window_SearchResults.Close()
-        #$Window_SearchResults.Visibility = "Collapsed"
-    })
+    $Button_Hide.add_Click.Invoke({$Global:FadeAllowed = $False ; WindowMain_FadeAnimation -From 2 -to -1 -DurationSec 0.6})
 
-    $Window_SearchResults.Top = $Window_Main.Top + $Window_Main.Height - 47
-    $Window_SearchResults.Left = $Window_Main.Left + $Window_Main.Width/2 - $Window_SearchResults.Width/2
-    $Window_SearchResults.Activate() | Out-Null
-    $SearchResults_Textbox_Search.focus()
-
-    $Window_SearchResults.Add_Loaded({[SystemWindowsFunctions]::SetForegroundWindow((New-Object System.Windows.Interop.WindowInteropHelper($Window_SearchResults)).Handle)})
+    $Window_main.Add_Loaded({
+        $Window_main.Title = $appName + " v." + $appVersion
+        $CheckBox_AlwaysOnTop.IsChecked = $Global:CheckBoxes[0]
+        $CheckBox_AutoComplete.IsChecked = $Global:CheckBoxes[1]
+        Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
     
-    $Window_SearchResults.ShowDialog()
-})
+        # Window does not become the foreground window when the user clicks it - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+        #$WindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
+        $Global:MainWindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
+        [SystemWindowsFunctions]::SetWindowLong($Global:MainWindowHandle,-20,0x08000000)
 
-$Button_More.add_Click.Invoke({
-    Send_Credentials $($Global:New_Button_More.uuid) $($Global:New_Button_More.Name) $($Global:New_Button_More.DBPath + "`t" + $Global:New_Button_More.Name) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftCtrl)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RightCtrl))) $([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LeftShift)) $(([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::LWin)) -or ([System.Windows.Input.Keyboard]::IsKeyDown([System.Windows.Input.Key]::RWin)))
-})
+        WindowMain_FadeAnimation -From 0 -to 1 -DurationSec 0.6
+    })
 
-$Window_main.Top = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height) - $Window_main.Height
-$Window_main.Left = ([System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Width) - $Window_main.Width
+    $Window_main.Activate() | Out-Null
+    $Window_main.ShowDialog()
 
-$CheckBox_AutoRun.Add_Checked({ New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName -Value $("cmd /c " + $([char]'"') + "Start /D $ExecDir powershell -WindowStyle hidden -file $ExecDir\" + $appName + ".ps1" + $([char]'"')) })
-$CheckBox_AutoRun.Add_UnChecked({ Remove-ItemProperty  -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName })
+    [System.GC]::Collect()
+    $appContext = New-Object System.Windows.Forms.ApplicationContext
+    [void][System.Windows.Forms.Application]::Run($appContext)
+}
 
-$Window_main.add_MouseLeftButtonDown({$Window_main.DragMove()})
-
-$Window_main.Add_MouseEnter({ If ($Window_main.Opacity -ne 1) { WindowMain_FadeAnimation -From $Window_main.Opacity -to 2 -DurationSec 0.6 } })
-
-$Window_main.Add_MouseWheel({ WindowMain_FadeAnimation -From $Window_main.Opacity -to 0 -DurationSec 0.4 })
-
-$Window_main.Add_MouseLeave({
-    If ($Global:FadeAllowed) {
-        $Animation = [System.Windows.Media.Animation.DoubleAnimation]::new()
-        $Animation.From = $Window_main.Opacity
-        $Animation.To = 0.25
-        $Animation.BeginTime = New-TimeSpan -Seconds 15
-        $Animation.Duration = New-TimeSpan -Seconds 0.6
-        $Window_main.BeginAnimation([System.Windows.Window]::OpacityProperty, $Animation)
-    }
-})
-
-$Button_Clipboard.add_Click.Invoke({
-    #Start-Sleep -Milliseconds 400
-    (Get-Clipboard -Raw).ToCharArray() | % { SendKey $_ }
-    if ($CheckBox_AutoComplete.IsChecked) {[Keyboard]::KeyPress([System.Windows.Forms.Keys]::Enter)}
-})
-
-$Button_Hide.add_Click.Invoke({$Global:FadeAllowed = $False ; WindowMain_FadeAnimation -From 2 -to -1 -DurationSec 0.6})
-
-$Window_main.Add_Loaded({
-    $Window_main.Title = $appName + " v." + $appVersion
-    $CheckBox_AlwaysOnTop.IsChecked = $Global:CheckBoxes[0]
-    $CheckBox_AutoComplete.IsChecked = $Global:CheckBoxes[1]
-    Try { if (Get-ItemPropertyValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $appName) {$CheckBox_AutoRun.IsChecked = $true} } catch {}
-    
-    # Window does not become the foreground window when the user clicks it - ref: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlonga, https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
-    #$WindowHandle = [SystemWindowsFunctions]::GetForegroundWindow()
-    $Global:MainWindowHandle = (Get-Process | ? {(($_.Name -eq "powershell")  -or ($_.Name -eq "powershell_ise") -or ($_.Name -eq "pwsh")) -and ($_.MainWindowTitle -eq $Window_main.Title)}).MainWindowHandle
-    [SystemWindowsFunctions]::SetWindowLong($Global:MainWindowHandle,-20,0x08000000)
-
-    WindowMain_FadeAnimation -From 0 -to 1 -DurationSec 0.6
-})
-
-$Window_main.Activate() | Out-Null
-$Window_main.ShowDialog()
-
-[System.GC]::Collect()
-$appContext = New-Object System.Windows.Forms.ApplicationContext
-[void][System.Windows.Forms.Application]::Run($appContext)
+Invoke-Command -ScriptBlock $InitializeMainWindow
